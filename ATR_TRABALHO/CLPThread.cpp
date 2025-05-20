@@ -1,52 +1,47 @@
-#include <windows.h>
+Ôªø#include <windows.h>
 #include <stdio.h>
-#define HAVE_STRUCT_TIMESPEC
 #include <pthread.h>
 #include <errno.h>
 #include <signal.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include "circular_list.h"
+#include "circular_buffer.h"
+#include <process.h>
+#include <conio.h>
+#include <sstream>
 
-
+#define HAVE_STRUCT_TIMESPEC
+#define _CRT_SECURE_NO_WARNINGS
 #define BUFFER_SIZE 200  // Tamanho fixo da lista circular
-
-//######### STRUCT CRIA«√O DE THREADS #########
-typedef struct {
-    const char* nome;   // Nome da thread 
-    int id;             // ID ou outros par‚metros
-} ThreadArgs;
-
-CircularList lista_circular;
+#define _CHECKERROR 1
+typedef unsigned (WINAPI* CAST_FUNCTION)(LPVOID);
+typedef unsigned* CAST_LPDWORD;
+DWORD WINAPI CLpThread(LPVOID);
 
 //######### STRUCT MENSAGEM FERROVIA ##########
 typedef struct {
-    int32_t nseq;       // N˙mero sequencial (1-9999999)
+    int32_t nseq;       // N√∫mero sequencial (1-9999999)
     char tipo[3];       // Sempre "00"
-    int8_t diag;        // DiagnÛstico (0-9)
+    int8_t diag;        // Diagn√≥stico (0-9)
     int16_t remota;     // Remota (000-999)
     char id[9];         // ID do sensor (8 chars + null terminator)
     int8_t estado;      // Estado (1 ou 2)
     char timestamp[13]; // HH:MM:SS:MS (12 chars + null terminator)
 } mensagem_ferrovia;
 
-//######### STRUCT AGRUPA ARGUMENTOS CLP #########
-typedef struct {
-    ThreadArgs thread_args;
-    int* sequencial;
-} CLP_Args;
-
-// FunÁ„o para gerar timestamp no formato HH:MM:SS:MS
+// Fun√ß√£o para gerar timestamp no formato HH:MM:SS:MS
 void gerar_timestamp(char* timestamp) {
     SYSTEMTIME time;
     GetLocalTime(&time);
-    sprintf(timestamp, "%02d:%02d:%02d:%03d",
+    // Usando sprintf_s com tamanho do buffer (13 para HH:MM:SS:MS)
+    sprintf_s(timestamp, 13, "%02d:%02d:%02d:%03d",
         time.wHour, time.wMinute, time.wSecond, time.wMilliseconds);
 }
 
-// FunÁ„o para formatar a mensagem completa
-void formatar_mensagem(char* buffer, const mensagem_ferrovia* msg) {
-    sprintf(buffer, "%07d;%s;%d;%03d;%s;%d;%s",
+// Fun√ß√£o para formatar a mensagem completa
+void formatar_mensagem(char* buffer, size_t buffer_size, const mensagem_ferrovia* msg) {
+    // Assumindo que buffer_size √© o tamanho total do buffer
+    sprintf_s(buffer, buffer_size, "%07d;%s;%d;%03d;%s;%d;%s",
         msg->nseq,
         msg->tipo,
         msg->diag,
@@ -56,58 +51,97 @@ void formatar_mensagem(char* buffer, const mensagem_ferrovia* msg) {
         msg->timestamp);
 }
 
-//FUN«√O DE SIMULA«√O DO CLP
-void* CLP_thread_func(void* arg) {
-    CLP_Args* args = (CLP_Args*)arg;
-    printf("Thread %s (ID=%d) iniciou!\n", args->thread_args.nome, args->thread_args.id);
+int gcounter_ferrovia = 0; //contador para mensagem de ferrovia
 
-    // SimulaÁ„o de tarefa da thread CLP
-    int tempo_rodas = 500; //tempo fixo para envio de mensagens sobre rodas
+//############## FUN√á√ÉO DE SIMULA√á√ÉO DO CLP ###############
+DWORD WINAPI CLpThread(LPVOID) {
+
     do {
-		int tempo_ferrovia = 100 + rand() % (2000 - 100 + 1); //tempo aleatÛrio para envio de mensagens sobre ferrovia
-        char mensagem[41];
-        int seq = __sync_fetch_and_add(args->sequencial, 1);  // Incrementa o sequencial de forma segura
-        mensagem_ferrovia msg = {
-        msg.nseq = seq,  // 1-9999999
-        msg.tipo = "00",
-        msg.diag = rand() % 10,           // 0-9
-        msg.remota = rand() % 1000,       // 000-999
-        msg.id = "STN-0023",              // Exemplo fixo
-        msg.estado = rand() % 2 + 1       // 1 ou 2
-        };
-        gerar_timestamp(msg.timestamp);
+        //ADICIONAR CHECAGEM DE BUFFER CHEIO P√ÅRA BLOQUEAR A THREAD
 
-        formatar_mensagem(mensagem, &msg);
+		mensagem_ferrovia msg;
+		char buffer[100]; // Buffer para armazenar a mensagem formatada
+		
+        // Preenche a mensagem com dados simulados
+		msg.nseq = ++gcounter_ferrovia; // Incrementa o n√∫mero sequencial
+		strcpy_s(msg.tipo, sizeof(msg.tipo), "00");
+		msg.diag = rand() % 2; // Diagn√≥stico
+        int remota = rand() % 1000; // Gera um n√∫mero entre 0 e 999
+        std::stringstream ss;
+        if (remota < 10) {
+            ss << "00" << remota;       // Ex: 5 ‚Üí 005
+        }
+        else if (remota < 100) {
+            ss << "0" << remota;        // Ex: 58 ‚Üí 058
+        }
+        else {
+            ss << remota;               // Ex: 123 ‚Üí 123
+        }
+        msg.remota = remota;
 
-        cb_push(&lista_circular, mensagem_ferrovia); //insere um dado na lista circular
+        //Mensagem recebida de um dos 100 sensores aleatoriamente
+        int numero = 1 + (rand() % 100); // Gera n√∫mero entre 1 e 100
+        char sensor[9];
+        sprintf_s(sensor, sizeof(sensor), "Sin-%04d", numero);
+        strcpy_s(msg.id, sizeof(msg.id), sensor);
 
+		msg.estado = rand()%2; // Estado 0 ou 1 aleatoriamente
+		gerar_timestamp(msg.timestamp); // Gera o timestamp
+		
+        // Formata a mensagem completa
+		formatar_mensagem(buffer, sizeof(buffer), &msg);
+		
+        // Escreve no buffer circular
+		WriteToBuffer(buffer, 40);
+        Sleep(1000);
+		
+        
+        if (msg.diag == 1) { //Caso haja falha na remota
+            strcpy_s(msg.id, sizeof(msg.id), "XXXXXXXX");
+            msg.estado= 0;
+        }
+    }while (1);
 
-	} while (1); // TROCAR POR CONDI«√O DE FINALIZA«√O DA THREAD;
-
-    printf("Thread %s terminou.\n", args->nome);
-    pthread_exit(NULL); // Finaliza a thread
-
-
-    return NULL;
+    return 0;
 }
 
 int main() {
-    cb_init(&lista_circular); // Inicializa a lista circular
-   
-//########################## CRIA THREAD DE SIMULA«√O DO CLP ##########################
-    pthread_t CLP_thread; // thread do CLP
-    int sequencial = 0;
-    // Empacota todos os argumentos
-    CLP_Args args = {
-        args.thread_args = { "CLP", 1 },
-        args.sequencial = &sequencial
-    };
-    if (pthread_create(&CLP_thread, NULL, CLP_thread_func, &args) != 0) {
-        perror("Erro ao criar thread CLP");
-        return EXIT_FAILURE;
-    }
-   printf("Thread CLP criada com sucesso!\n");
-    
+    InitializeBuffer();
 
-    return EXIT_SUCCESS;
+    HANDLE hThread;
+    DWORD dwThreadId;
+
+    // Cria a thread CLp que escreve no buffer
+    hThread = (HANDLE)_beginthreadex(
+        NULL,
+        0,
+        (CAST_FUNCTION)CLpThread,
+        NULL,
+        0,
+        (CAST_LPDWORD)&dwThreadId
+    );
+
+    if (hThread) {
+        printf("Thread CLp criada com ID=0x%x\n", dwThreadId);
+    }
+    else {
+        //CheckForError(FALSE);
+    }
+
+    // Loop principal que l√™ e exibe o buffer periodicamente
+    while (!_kbhit()) {
+        PrintBuffer();
+        Sleep(1000); // Verifica o buffer a cada segundo
+    }
+
+    // Limpeza
+    WaitForSingleObject(hThread, INFINITE);
+    CloseHandle(hThread);
+    DestroyBuffer();
+
+    printf("\nPressione qualquer tecla para sair...\n");
+    _getch();
+
+    return 0;
 }
+
