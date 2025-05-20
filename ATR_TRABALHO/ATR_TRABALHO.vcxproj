@@ -133,10 +133,11 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="circular_list.cpp" />
     <ClCompile Include="CLPThread.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="CLPThread.h" />
+    <ClInclude Include="circular_list.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

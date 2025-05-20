@@ -18,9 +18,12 @@
     <ClCompile Include="CLPThread.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="circular_list.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="CLPThread.h">
+    <ClInclude Include="circular_list.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
