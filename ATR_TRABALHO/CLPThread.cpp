@@ -110,6 +110,7 @@ DWORD WINAPI CLpThread(LPVOID) {
             msg_h.nseq = ++gcounter_hotbox;
             strcpy_s(msg_h.tipo, sizeof(msg_h.tipo), "99");
 
+
             int idnum = 1 + (rand() % 100);
             sprintf_s(msg_h.id, sizeof(msg_h.id), "HWD-%04d", idnum);
             msg_h.estado = rand() % 2;  // 0 ou 1
