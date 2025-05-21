@@ -1,6 +1,6 @@
 ﻿#include <windows.h>
 #include <stdio.h>
-#define HAVE_STRUCT_TIMESPEC // tive que colocar isso devido a um problema que estava tendo sobre a biblioteca Pthread e o Vscode
+#define HAVE_STRUCT_TIMESPEC 
 #include <pthread.h>
 #include <errno.h>
 #include <signal.h>
