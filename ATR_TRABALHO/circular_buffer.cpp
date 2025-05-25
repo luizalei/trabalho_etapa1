@@ -9,39 +9,53 @@ void InitializeBuffers() {
     ferroviaBuffer.head = 0;
     ferroviaBuffer.tail = 0;
     ferroviaBuffer.count = 0;
+    ferroviaBuffer.isFull = FALSE;
     InitializeCriticalSection(&ferroviaBuffer.cs);
+    ferroviaBuffer.hEventSpaceAvailable = CreateEvent(NULL, TRUE, TRUE, NULL);
 
     // Initialize roda buffer
     rodaBuffer.head = 0;
     rodaBuffer.tail = 0;
     rodaBuffer.count = 0;
+    rodaBuffer.isFull = FALSE;
     InitializeCriticalSection(&rodaBuffer.cs);
+    rodaBuffer.hEventSpaceAvailable = CreateEvent(NULL, TRUE, TRUE, NULL);
 }
 
 void DestroyBuffers() {
     DeleteCriticalSection(&ferroviaBuffer.cs);
     DeleteCriticalSection(&rodaBuffer.cs);
+    CloseHandle(ferroviaBuffer.hEventSpaceAvailable);
+    CloseHandle(rodaBuffer.hEventSpaceAvailable);
 }
 
 void WriteToFerroviaBuffer(const char* value) {
     EnterCriticalSection(&ferroviaBuffer.cs);
 
-    if (ferroviaBuffer.count < BUFFER_SIZE) {
-        errno_t err = strncpy_s(ferroviaBuffer.data[ferroviaBuffer.tail],
-            MAX_MSG_LENGTH,
-            value,
-            MAX_MSG_LENGTH - 1);
+    // Se o buffer está cheio, não escreve e espera
+    while (ferroviaBuffer.count >= BUFFER_SIZE) {
+        ferroviaBuffer.isFull = TRUE;
+        ResetEvent(ferroviaBuffer.hEventSpaceAvailable);
+        LeaveCriticalSection(&ferroviaBuffer.cs);
 
-        if (err == 0) {
-            ferroviaBuffer.tail = (ferroviaBuffer.tail + 1) % BUFFER_SIZE;
-            ferroviaBuffer.count++;
-        }
-        else {
-            printf("Erro ao copiar mensagem para o buffer ferrovia: %d\n", err);
-        }
+        // Espera por espaço disponível
+        WaitForSingleObject(ferroviaBuffer.hEventSpaceAvailable, INFINITE);
+
+        EnterCriticalSection(&ferroviaBuffer.cs);
+    }
+
+    errno_t err = strncpy_s(ferroviaBuffer.data[ferroviaBuffer.tail],
+        MAX_MSG_LENGTH,
+        value,
+        MAX_MSG_LENGTH - 1);
+
+    if (err == 0) {
+        ferroviaBuffer.tail = (ferroviaBuffer.tail + 1) % BUFFER_SIZE;
+        ferroviaBuffer.count++;
+        ferroviaBuffer.isFull = (ferroviaBuffer.count >= BUFFER_SIZE);
     }
     else {
-        printf("Buffer ferrovia cheio - mensagem descartada: %s\n", value);
+        printf("Erro ao copiar mensagem para o buffer ferrovia: %d\n", err);
     }
 
     LeaveCriticalSection(&ferroviaBuffer.cs);
@@ -50,22 +64,29 @@ void WriteToFerroviaBuffer(const char* value) {
 void WriteToRodaBuffer(const char* value) {
     EnterCriticalSection(&rodaBuffer.cs);
 
-    if (rodaBuffer.count < BUFFER_SIZE) {
-        errno_t err = strncpy_s(rodaBuffer.data[rodaBuffer.tail],
-            SMALL_MSG_LENGTH,
-            value,
-            SMALL_MSG_LENGTH - 1);
+    while (rodaBuffer.count >= BUFFER_SIZE) {
+        rodaBuffer.isFull = TRUE;
+        ResetEvent(rodaBuffer.hEventSpaceAvailable); // Garante que o evento não está sinalizado
+        LeaveCriticalSection(&rodaBuffer.cs);
 
-        if (err == 0) {
-            rodaBuffer.tail = (rodaBuffer.tail + 1) % BUFFER_SIZE;
-            rodaBuffer.count++;
-        }
-        else {
-            printf("Erro ao copiar mensagem para o buffer roda: %d\n", err);
-        }
+        // Espera por espaço disponível
+        WaitForSingleObject(rodaBuffer.hEventSpaceAvailable, INFINITE);
+
+        EnterCriticalSection(&rodaBuffer.cs);
+    }
+
+    errno_t err = strncpy_s(rodaBuffer.data[rodaBuffer.tail],
+        SMALL_MSG_LENGTH,
+        value,
+        SMALL_MSG_LENGTH - 1);
+
+    if (err == 0) {
+        rodaBuffer.tail = (rodaBuffer.tail + 1) % BUFFER_SIZE;
+        rodaBuffer.count++;
+        rodaBuffer.isFull = (rodaBuffer.count >= BUFFER_SIZE);
     }
     else {
-        printf("Buffer roda cheio - mensagem descartada: %s\n", value);
+        printf("Erro ao copiar mensagem para o buffer roda: %d\n", err);
     }
 
     LeaveCriticalSection(&rodaBuffer.cs);
@@ -84,6 +105,13 @@ int ReadFromFerroviaBuffer(char* output) {
         if (err == 0) {
             ferroviaBuffer.head = (ferroviaBuffer.head + 1) % BUFFER_SIZE;
             ferroviaBuffer.count--;
+
+            // Se estava cheio e agora tem espaço, sinaliza
+            if (ferroviaBuffer.isFull && ferroviaBuffer.count < BUFFER_SIZE) {
+                ferroviaBuffer.isFull = FALSE;
+                SetEvent(ferroviaBuffer.hEventSpaceAvailable);
+            }
+
             result = 1;
         }
         else {
@@ -111,6 +139,13 @@ int ReadFromRodaBuffer(char* output) {
         if (err == 0) {
             rodaBuffer.head = (rodaBuffer.head + 1) % BUFFER_SIZE;
             rodaBuffer.count--;
+
+            // Se estava cheio e agora tem espaço, sinaliza
+            if (rodaBuffer.isFull && rodaBuffer.count < BUFFER_SIZE) {
+                rodaBuffer.isFull = FALSE;
+                SetEvent(rodaBuffer.hEventSpaceAvailable);
+            }
+
             result = 1;
         }
         else {
@@ -130,17 +165,19 @@ void PrintBuffers() {
     EnterCriticalSection(&rodaBuffer.cs);
 
     printf("=== Buffers ===\n");
-    printf("Ferrovia [%d/%d]:\n", ferroviaBuffer.count, BUFFER_SIZE);
+    printf("Ferrovia [%d/%d] %s:\n", ferroviaBuffer.count, BUFFER_SIZE,
+        ferroviaBuffer.isFull ? "(CHEIO)" : "");
     int index = ferroviaBuffer.head;
     for (int i = 0; i < ferroviaBuffer.count; i++) {
-        printf("%s\n", ferroviaBuffer.data[index]);  
+        printf("%s\n", ferroviaBuffer.data[index]);
         index = (index + 1) % BUFFER_SIZE;
     }
 
-    printf("\nRoda [%d/%d]:\n", rodaBuffer.count, BUFFER_SIZE);
+    printf("\nRoda [%d/%d] %s:\n", rodaBuffer.count, BUFFER_SIZE,
+        rodaBuffer.isFull ? "(CHEIO)" : "");
     index = rodaBuffer.head;
     for (int i = 0; i < rodaBuffer.count; i++) {
-        printf("%s\n", rodaBuffer.data[index]);  
+        printf("%s\n", rodaBuffer.data[index]);
         index = (index + 1) % BUFFER_SIZE;
     }
     printf("\n");

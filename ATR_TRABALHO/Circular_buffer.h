@@ -15,7 +15,9 @@ typedef struct {
     int head;
     int tail;
     int count;
+    BOOL isFull;
     CRITICAL_SECTION cs;  // Seção crítica para proteger o buffer
+	HANDLE hEventSpaceAvailable; // Evento para sinalizar espaço disponível
 } CircularBuffer;
 
 // Variável global do buffer

@@ -22,6 +22,7 @@ typedef unsigned* CAST_LPDWORD;
 HANDLE hEvent_ferrovia; // Handle para o evento de timeout da ferrovia
 HANDLE hEvent_roda; // Handle para o evento de timeout da roda
 HANDLE WINAPI CreateTimerQueue(VOID);
+HANDLE hBufferRodaCheio;  // Evento para sinalizar espaço no buffer
 DWORD WINAPI CLPThread(LPVOID);
 
 //######### STRUCT MENSAGEM FERROVIA ##########
@@ -83,6 +84,7 @@ void formatar_msg_roda(char* buffer, size_t buffer_size, const mensagem_roda* ms
 
 int gcounter_ferrovia = 0; //contador para mensagem de ferrovia
 int gcounter_roda = 0; //contador para mensagem de roda
+
 
 void cria_msg_ferrovia() {
     mensagem_ferrovia msg;
@@ -178,23 +180,36 @@ DWORD WINAPI CLPThread(LPVOID) {
     }
 
     do {
+        // Verifica buffer roda
+        EnterCriticalSection(&rodaBuffer.cs);
+        BOOL rodaCheia = rodaBuffer.isFull;
+        LeaveCriticalSection(&rodaBuffer.cs);
+
+        if (rodaCheia) {
+            WaitForSingleObject(rodaBuffer.hEventSpaceAvailable, INFINITE);
+        }
+
+        // Verifica buffer ferrovia
+        EnterCriticalSection(&ferroviaBuffer.cs);
+        BOOL ferroviaCheia = ferroviaBuffer.isFull;
+        LeaveCriticalSection(&ferroviaBuffer.cs);
+
+        if (ferroviaCheia) {
+            WaitForSingleObject(ferroviaBuffer.hEventSpaceAvailable, INFINITE);
+        }
+
+        // Verifica se os buffers estão cheios antes de criar nova mensagem, se sim, bloquea a thread até que esvaziem
+
 
         int tempo_ferrovia = 100 + (rand() % 1901); //tempo aleatório entre 100 e 2000ms
-
-        /* // Enfileira o temporizador da ferrovia
-        status_queue = CreateTimerQueueTimer(&hEvent_ferrovia, hTimerQueue, (WAITORTIMERCALLBACK)cria_msg_ferrovia,
-            NULL, tempo_ferrovia, 0, WT_EXECUTEDEFAULT);
-        
-        if (!status_queue) {
-            printf("Erro em CreateTimerQueueTimer [1]! Codigo = %d)\n", GetLastError());
-            return 0;
-        }*/
-        Sleep(tempo_ferrovia);
+        Sleep(tempo_ferrovia); //Temporizador temporário para a entrega da etapa 1
 		cria_msg_ferrovia(); // Chama a função de criação da mensagem de ferrovia
         
         //ADICIONAR CHECAGEM DE BUFFER CHEIO PARA BLOQUEAR A THREAD
 
-        
+       
+
+
     }while (1);
 
     return 0;
