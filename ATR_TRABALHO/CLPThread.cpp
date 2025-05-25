@@ -205,11 +205,7 @@ DWORD WINAPI CLPThread(LPVOID) {
         Sleep(tempo_ferrovia); //Temporizador temporário para a entrega da etapa 1
 		cria_msg_ferrovia(); // Chama a função de criação da mensagem de ferrovia
         
-        //ADICIONAR CHECAGEM DE BUFFER CHEIO PARA BLOQUEAR A THREAD
-
-       
-
-
+   
     }while (1);
 
     return 0;
