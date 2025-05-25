@@ -20,6 +20,7 @@ typedef unsigned (WINAPI* CAST_FUNCTION)(LPVOID);
 typedef unsigned* CAST_LPDWORD;
 
 HANDLE hEvent_ferrovia; // Handle para o evento de timeout da ferrovia
+HANDLE hEvent_roda; // Handle para o evento de timeout da roda
 HANDLE WINAPI CreateTimerQueue(VOID);
 DWORD WINAPI CLPThread(LPVOID);
 
@@ -34,7 +35,18 @@ typedef struct {
     char timestamp[13]; // HH:MM:SS:MS (12 chars + null terminator)
 } mensagem_ferrovia;
 
-// Função para gerar timestamp no formato HH:MM:SS:MS
+//######### STRUCT MENSAGEM RODA ##########
+typedef struct {
+    int32_t nseq;       // Número sequencial (1-9999999)
+    char tipo[3];       // Sempre "00"
+    int8_t diag;        // Diagnóstico (0-9)
+    int16_t remota;     // Remota (000-999)
+    char id[9];         // ID do sensor (8 chars + null terminator)
+    int8_t estado;      // Estado (1 ou 2)
+    char timestamp[13]; // HH:MM:SS:MS (12 chars + null terminator)
+} mensagem_roda;
+
+//########## Função para gerar timestamp no formato HH:MM:SS:MS ################
 void gerar_timestamp(char* timestamp) {
     SYSTEMTIME time;
     GetLocalTime(&time);
@@ -43,8 +55,8 @@ void gerar_timestamp(char* timestamp) {
         time.wHour, time.wMinute, time.wSecond, time.wMilliseconds);
 }
 
-// Função para formatar a mensagem completa
-void formatar_mensagem(char* buffer, size_t buffer_size, const mensagem_ferrovia* msg) {
+//############# Função para formatar a mensagem ferrovia ###################
+void formatar_msg_ferrovia(char* buffer, size_t buffer_size, const mensagem_ferrovia* msg) {
     // Assumindo que buffer_size é o tamanho total do buffer
     sprintf_s(buffer, buffer_size, "%07d;%s;%d;%03d;%s;%d;%s",
         msg->nseq,
@@ -56,86 +68,130 @@ void formatar_mensagem(char* buffer, size_t buffer_size, const mensagem_ferrovia
         msg->timestamp);
 }
 
+//############# Função para formatar a mensagem de roda quente ###################
+void formatar_msg_roda(char* buffer, size_t buffer_size, const mensagem_roda* msg) {
+    // Formata a mensagem no padrão especificado: NNNNNNN;NN;AAAAAAAA;N;HH:MM:SS:MS
+    // Total: 7 + 1 + 2 + 1 + 8 + 1 + 1 + 1 + 12 = 34 caracteres
+    sprintf_s(buffer, buffer_size, "%07d;%s;%s;%d;%s",
+        msg->nseq,      // 7 dígitos (NSEQ)
+        msg->tipo,      // 2 caracteres (TIPO)
+        msg->id,        // 8 caracteres (ID)
+        msg->estado,    // 1 dígito (ESTADO)
+        msg->timestamp  // 12 caracteres (TIMESTAMP)
+    );
+}
+
 int gcounter_ferrovia = 0; //contador para mensagem de ferrovia
+int gcounter_roda = 0; //contador para mensagem de roda
 
 void cria_msg_ferrovia() {
-    
+    mensagem_ferrovia msg;
+    char buffer[MAX_MSG_LENGTH]; // Buffer para armazenar a mensagem formatada
 
+    // Preenche a mensagem com dados simulados
+    msg.nseq = ++gcounter_ferrovia; // Incrementa o número sequencial
+    strcpy_s(msg.tipo, sizeof(msg.tipo), "00");
 
+    //Mensagem recebida de um dos 100 sensores aleatoriamente
+    int numero = 1 + (rand() % 100); // Gera número entre 1 e 100
+    char sensor[9];
+    sprintf_s(sensor, sizeof(sensor), "Sin-%04d", numero);
+    strcpy_s(msg.id, sizeof(msg.id), sensor);
+
+    // Diagnóstico
+    msg.diag = rand() % 2;
+    if (msg.diag == 1) { //Caso haja falha na remota
+        strcpy_s(msg.id, sizeof(msg.id), "XXXXXXXX");
+        msg.estado = 0;
+    }
+
+    //Remota
+    int remota = rand() % 1000; // Gera um número entre 0 e 999
+    std::stringstream ss;
+    if (remota < 10) {
+        ss << "00" << remota;       // Ex: 5 → 005
+    }
+    else if (remota < 100) {
+        ss << "0" << remota;        // Ex: 58 → 058
+    }
+    else {
+        ss << remota;               // Ex: 123 → 123
+    }
+    msg.remota = remota;
+
+    msg.estado = rand() % 2; // Estado 0 ou 1 aleatoriamente
+    gerar_timestamp(msg.timestamp); // Gera o timestamp
+
+    // Formata a mensagem completa
+    formatar_msg_ferrovia(buffer, sizeof(buffer), &msg);
+
+    // Escreve no buffer circular
+    WriteToFerroviaBuffer(buffer);
+}
+
+void cria_msg_roda() {
+    mensagem_roda msg;
+    char buffer[SMALL_MSG_LENGTH]; // Buffer para armazenar a mensagem formatada
+
+    // Preenche a mensagem com dados simulados
+    msg.nseq = ++gcounter_roda; // Incrementa o número sequencial
+    strcpy_s(msg.tipo, sizeof(msg.tipo), "99");
+
+    //Mensagem recebida de um dos 100 sensores aleatoriamente
+    int numero = 1 + (rand() % 100); // Gera número entre 1 e 100
+    char sensor[9];
+    sprintf_s(sensor, sizeof(sensor), "Sin-%04d", numero);
+    strcpy_s(msg.id, sizeof(msg.id), sensor);
+
+    //Estado
+    msg.estado = rand() % 2; // Estado 0 ou 1 aleatoriamente
+
+    gerar_timestamp(msg.timestamp); // Gera o timestamp
+
+    // Formata a mensagem completa
+    formatar_msg_roda(buffer, sizeof(buffer), &msg);
+
+    // Escreve no buffer circular
+    WriteToRodaBuffer(buffer);
 }
 
 //############## FUNÇÃO DE SIMULAÇÃO DO CLP ###############
 DWORD WINAPI CLPThread(LPVOID) {
+    HANDLE hTimerQueue;
+    HANDLE hEvent_ferrovia;
+    HANDLE hEvent_roda;
+    BOOL status_queue;
+
+    //Cria fila de temporizadores
+    hTimerQueue = CreateTimerQueue();
+    if (hTimerQueue == NULL) {
+        printf("Falha em CreateTimerQueue! Codigo =%d)\n", GetLastError());
+        return 0;
+    }
+
+    // Enfileira o temporizador da roda quente, fora do DO WHILE porque tem temporização fixa e posso usar a temporização periódica
+    status_queue = CreateTimerQueueTimer(&hEvent_roda, hTimerQueue, (WAITORTIMERCALLBACK)cria_msg_roda,
+        NULL, 500, 500, WT_EXECUTEDEFAULT);
+    if (!status_queue) {
+        printf("Erro em CreateTimerQueueTimer [2]! Codigo = %d)\n", GetLastError());
+        return 0;
+    }
 
     do {
-        HANDLE hTimerQueue;
-        HANDLE hEvent_ferrovia;
-        BOOL status_queue;
-        hTimerQueue = CreateTimerQueue();
-        if (hTimerQueue == NULL) {
-            printf("Falha em CreateTimerQueue! Codigo =%d)\n", GetLastError());
-            return 0;
-        }
-        // Enfileira primeiro temporizador com sua fun��o callback
-        status_queue = CreateTimerQueueTimer(&hTimerID1, hTimerQueue, (WAITORTIMERCALLBACK)Pid,
-            NULL, 7000, 5000, WT_EXECUTEDEFAULT);
-        //NULL, 1000, 1000, WT_EXECUTEDEFAULT);
-        if (!status) {
+
+        int tempo_ferrovia = 100 + (rand() % 1901); //tempo aleatório entre 100 e 2000ms
+
+        /* // Enfileira o temporizador da ferrovia
+        status_queue = CreateTimerQueueTimer(&hEvent_ferrovia, hTimerQueue, (WAITORTIMERCALLBACK)cria_msg_ferrovia,
+            NULL, tempo_ferrovia, 0, WT_EXECUTEDEFAULT);
+        
+        if (!status_queue) {
             printf("Erro em CreateTimerQueueTimer [1]! Codigo = %d)\n", GetLastError());
             return 0;
-        }
-
-        int t_ferrovia = 100 + (rand() % 1899); //Tempo aléatorio para envio de mensagens do tipo ferrovia 
-        printf("tempo msg ferrovia %d \n", t_ferrovia);
+        }*/
+        Sleep(tempo_ferrovia);
+		cria_msg_ferrovia(); // Chama a função de criação da mensagem de ferrovia
         
-        status = WaitForSingleObject(hEvent_ferrovia, t_ferrovia);
-        printf("STATUS: %d \n", status);
-        Sleep(1000);
-
-        if (status == WAIT_TIMEOUT) {
-            mensagem_ferrovia msg;
-            char buffer[100]; // Buffer para armazenar a mensagem formatada
-
-            // Preenche a mensagem com dados simulados
-            msg.nseq = ++gcounter_ferrovia; // Incrementa o número sequencial
-            strcpy_s(msg.tipo, sizeof(msg.tipo), "00");
-
-            //Mensagem recebida de um dos 100 sensores aleatoriamente
-            int numero = 1 + (rand() % 100); // Gera número entre 1 e 100
-            char sensor[9];
-            sprintf_s(sensor, sizeof(sensor), "Sin-%04d", numero);
-            strcpy_s(msg.id, sizeof(msg.id), sensor);
-
-            // Diagnóstico
-            msg.diag = rand() % 2; 
-            if (msg.diag == 1) { //Caso haja falha na remota
-                strcpy_s(msg.id, sizeof(msg.id), "XXXXXXXX");
-                msg.estado = 0;
-            }
-
-            //Remota
-            int remota = rand() % 1000; // Gera um número entre 0 e 999
-            std::stringstream ss;
-            if (remota < 10) {
-                ss << "00" << remota;       // Ex: 5 → 005
-            }
-            else if (remota < 100) {
-                ss << "0" << remota;        // Ex: 58 → 058
-            }
-            else {
-                ss << remota;               // Ex: 123 → 123
-            }
-            msg.remota = remota;
-
-            msg.estado = rand() % 2; // Estado 0 ou 1 aleatoriamente
-            gerar_timestamp(msg.timestamp); // Gera o timestamp
-
-            // Formata a mensagem completa
-            formatar_mensagem(buffer, sizeof(buffer), &msg);
-
-            // Escreve no buffer circular
-            WriteToBuffer(buffer, 40);
-        }
         //ADICIONAR CHECAGEM DE BUFFER CHEIO PARA BLOQUEAR A THREAD
 
         
@@ -145,7 +201,7 @@ DWORD WINAPI CLPThread(LPVOID) {
 }
 
 int main() {
-    InitializeBuffer();
+    InitializeBuffers();
 
     HANDLE hThread;
     DWORD dwThreadId;
@@ -164,21 +220,18 @@ int main() {
     if (hThread) {
         printf("Thread CLP criada com ID=0x%x\n", dwThreadId);
     }
-    else {
-        //CheckForError(FALSE);
-    }
+    
 
     // Loop principal que lê e exibe o buffer periodicamente
     while (!_kbhit()) {
-        PrintBuffer();
+        PrintBuffers();
         Sleep(1000); // Verifica o buffer a cada segundo
     }
 
     // Limpeza
     WaitForSingleObject(hThread, INFINITE);
     CloseHandle(hThread);
-    DestroyBuffer();
-    DeleteTimerQueueTimerEX();
+    DestroyBuffers();
 
     printf("\nPressione qualquer tecla para sair...\n");
     _getch();

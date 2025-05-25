@@ -19,12 +19,15 @@ typedef struct {
 } CircularBuffer;
 
 // Variável global do buffer
-extern CircularBuffer circularBuffer;
+extern CircularBuffer ferroviaBuffer;
+extern CircularBuffer rodaBuffer;
 
-void InitializeBuffer();
-void DestroyBuffer();
-void WriteToBuffer(const char* value, size_t msg_size); 
-int ReadFromBuffer(char* output, size_t* msg_size);
-void PrintBuffer();
+void InitializeBuffers();
+void DestroyBuffers();
+void WriteToFerroviaBuffer(const char* value);
+void WriteToRodaBuffer(const char* value);
+int ReadFromFerroviaBuffer(char* output);
+int ReadFromRodaBuffer(char* output);
+void PrintBuffers();
 
 #endif // CIRCULAR_BUFFER_H
