@@ -23,7 +23,11 @@ HANDLE hEvent_ferrovia; // Handle para o evento de timeout da ferrovia
 HANDLE hEvent_roda; // Handle para o evento de timeout da roda
 HANDLE WINAPI CreateTimerQueue(VOID);
 HANDLE hBufferRodaCheio;  // Evento para sinalizar espaço no buffer
+HANDLE hMutexBufferRoda; // Mutex para proteger o buffer de roda quente
+HANDLE hMutexBufferFerrovia; // Mutex para proteger o buffer de ferrovia
+
 DWORD WINAPI CLPThread(LPVOID);
+
 
 //######### STRUCT MENSAGEM FERROVIA ##########
 typedef struct {
@@ -181,18 +185,19 @@ DWORD WINAPI CLPThread(LPVOID) {
 
     do {
         // Verifica buffer roda
-        EnterCriticalSection(&rodaBuffer.cs);
+        //Conquista MUTEX
+        WaitForSingleObject(hMutexBufferRoda, INFINITE);
         BOOL rodaCheia = rodaBuffer.isFull;
-        LeaveCriticalSection(&rodaBuffer.cs);
+		ReleaseMutex(hMutexBufferRoda); //Libera MUTEX
 
         if (rodaCheia) {
             WaitForSingleObject(rodaBuffer.hEventSpaceAvailable, INFINITE);
         }
 
         // Verifica buffer ferrovia
-        EnterCriticalSection(&ferroviaBuffer.cs);
+        WaitForSingleObject(hMutexBufferFerrovia, INFINITE);
         BOOL ferroviaCheia = ferroviaBuffer.isFull;
-        LeaveCriticalSection(&ferroviaBuffer.cs);
+        ReleaseMutex(hMutexBufferFerrovia); //Libera MUTEX
 
         if (ferroviaCheia) {
             WaitForSingleObject(ferroviaBuffer.hEventSpaceAvailable, INFINITE);
@@ -231,7 +236,9 @@ int main() {
     if (hThread) {
         printf("Thread CLP criada com ID=0x%x\n", dwThreadId);
     }
-    
+
+    hMutexBufferRoda = CreateMutex(NULL, FALSE, L"BufferRoda");
+    hMutexBufferFerrovia = CreateMutex(NULL, FALSE, L"BufferFerrovia");
 
     // Loop principal que lê e exibe o buffer periodicamente
     while (!_kbhit()) {
@@ -243,6 +250,8 @@ int main() {
     WaitForSingleObject(hThread, INFINITE);
     CloseHandle(hThread);
     DestroyBuffers();
+    CloseHandle(hMutexBufferRoda);
+    CloseHandle(hMutexBufferFerrovia);
 
     printf("\nPressione qualquer tecla para sair...\n");
     _getch();
