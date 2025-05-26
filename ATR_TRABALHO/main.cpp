@@ -11,6 +11,7 @@
 #include <conio.h>
 #include <sstream>
 
+//############ DEFINIÇÕES GLOBAIS ############
 #define __WIN32_WINNT 0X0500
 #define HAVE_STRUCT_TIMESPEC
 #define _CRT_SECURE_NO_WARNINGS
@@ -19,6 +20,7 @@
 typedef unsigned (WINAPI* CAST_FUNCTION)(LPVOID);
 typedef unsigned* CAST_LPDWORD;
 
+//############# HANDLES ##########
 HANDLE hEvent_ferrovia; // Handle para o evento de timeout da ferrovia
 HANDLE hEvent_roda; // Handle para o evento de timeout da roda
 HANDLE WINAPI CreateTimerQueue(VOID);
@@ -49,7 +51,7 @@ typedef struct {
     char timestamp[13]; // HH:MM:SS:MS (12 chars + null terminator)
 } mensagem_roda;
 
-//########## Função para gerar timestamp no formato HH:MM:SS:MS ################
+//########## FUNÇÃO PARA TIMESTAMP HH:MM:SS:MS ################
 void gerar_timestamp(char* timestamp) {
     SYSTEMTIME time;
     GetLocalTime(&time);
@@ -58,7 +60,7 @@ void gerar_timestamp(char* timestamp) {
         time.wHour, time.wMinute, time.wSecond, time.wMilliseconds);
 }
 
-//############# Função para formatar a mensagem ferrovia ###################
+//############# FUNÇÃO FORMATA MSG FERROVIA ###################
 void formatar_msg_ferrovia(char* buffer, size_t buffer_size, const mensagem_ferrovia* msg) {
     // Assumindo que buffer_size é o tamanho total do buffer
     sprintf_s(buffer, buffer_size, "%07d;%s;%d;%03d;%s;%d;%s",
@@ -71,7 +73,7 @@ void formatar_msg_ferrovia(char* buffer, size_t buffer_size, const mensagem_ferr
         msg->timestamp);
 }
 
-//############# Função para formatar a mensagem de roda quente ###################
+//############# FUNÇÃO FORMATA MSG RODA QUENTE ###################
 void formatar_msg_roda(char* buffer, size_t buffer_size, const mensagem_roda* msg) {
     // Formata a mensagem no padrão especificado: NNNNNNN;NN;AAAAAAAA;N;HH:MM:SS:MS
     // Total: 7 + 1 + 2 + 1 + 8 + 1 + 1 + 1 + 12 = 34 caracteres
@@ -84,10 +86,11 @@ void formatar_msg_roda(char* buffer, size_t buffer_size, const mensagem_roda* ms
     );
 }
 
+//############# CONTADORES GLOBAIS PARA MENSAGENS ################
 int gcounter_ferrovia = 0; //contador para mensagem de ferrovia
 int gcounter_roda = 0; //contador para mensagem de roda
 
-
+//############# FUNÇÃO DE CRIAÇÃO DE MSG FERROVIA ################
 void cria_msg_ferrovia() {
     mensagem_ferrovia msg;
     char buffer[MAX_MSG_LENGTH]; // Buffer para armazenar a mensagem formatada
@@ -133,6 +136,7 @@ void cria_msg_ferrovia() {
     WriteToFerroviaBuffer(buffer);
 }
 
+//############# FUNÇÃO DE CRIAÇÃO DE MSG RODA QUENTE ################
 void cria_msg_roda() {
     mensagem_roda msg;
     char buffer[SMALL_MSG_LENGTH]; // Buffer para armazenar a mensagem formatada
@@ -159,11 +163,13 @@ void cria_msg_roda() {
     WriteToRodaBuffer(buffer);
 }
 
-//############## FUNÇÃO DE SIMULAÇÃO DO CLP ###############
+//############## FUNÇÃO DA THREAD DE SIMULAÇÃO DO CLP ###############
 DWORD WINAPI CLPThread(LPVOID) {
+	// Inicializa os eventos e a fila de temporizadores
     HANDLE hTimerQueue;
     HANDLE hEvent_ferrovia;
     HANDLE hEvent_roda;
+
     BOOL status_queue;
 
     //Cria fila de temporizadores
@@ -183,8 +189,7 @@ DWORD WINAPI CLPThread(LPVOID) {
 
     do {
         // Verifica buffer roda
-        //Conquista MUTEX
-        WaitForSingleObject(hMutexBufferRoda, INFINITE);
+        WaitForSingleObject(hMutexBufferRoda, INFINITE);//Conquista MUTEX
         BOOL rodaCheia = rodaBuffer.isFull;
 		ReleaseMutex(hMutexBufferRoda); //Libera MUTEX
 
@@ -193,7 +198,7 @@ DWORD WINAPI CLPThread(LPVOID) {
         }
 
         // Verifica buffer ferrovia
-        WaitForSingleObject(hMutexBufferFerrovia, INFINITE);
+        WaitForSingleObject(hMutexBufferFerrovia, INFINITE); //Conquista MUTEX
         BOOL ferroviaCheia = ferroviaBuffer.isFull;
         ReleaseMutex(hMutexBufferFerrovia); //Libera MUTEX
 
@@ -201,19 +206,17 @@ DWORD WINAPI CLPThread(LPVOID) {
             WaitForSingleObject(ferroviaBuffer.hEventSpaceAvailable, INFINITE);
         }
 
-        // Verifica se os buffers estão cheios antes de criar nova mensagem, se sim, bloquea a thread até que esvaziem
-
-
         int tempo_ferrovia = 100 + (rand() % 1901); //tempo aleatório entre 100 e 2000ms
+		//SERÁ SUBSTITUIDO NA ENTREGA DA ETAPA 2 PARA RETIRADA DA FUNÇÃO SLEEP()
         Sleep(tempo_ferrovia); //Temporizador temporário para a entrega da etapa 1
 		cria_msg_ferrovia(); // Chama a função de criação da mensagem de ferrovia
         
-   
     }while (1);
 
     return 0;
 }
 
+//############# FUNÇÃO MAIN DO SISTEMA ################
 int main() {
     InitializeBuffers();
 
@@ -234,9 +237,6 @@ int main() {
     if (hCLPThread) {
         printf("Thread CLP criada com ID=0x%x\n", dwThreadId);
     }
-
-    hMutexBufferRoda = CreateMutex(NULL, FALSE, L"BufferRoda");
-    hMutexBufferFerrovia = CreateMutex(NULL, FALSE, L"BufferFerrovia");
 
     // Loop principal que lê e exibe o buffer periodicamente
     while (!_kbhit()) {
