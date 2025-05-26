@@ -23,8 +23,6 @@ HANDLE hEvent_ferrovia; // Handle para o evento de timeout da ferrovia
 HANDLE hEvent_roda; // Handle para o evento de timeout da roda
 HANDLE WINAPI CreateTimerQueue(VOID);
 HANDLE hBufferRodaCheio;  // Evento para sinalizar espaço no buffer
-HANDLE hMutexBufferRoda; // Mutex para proteger o buffer de roda quente
-HANDLE hMutexBufferFerrovia; // Mutex para proteger o buffer de ferrovia
 
 DWORD WINAPI CLPThread(LPVOID);
 

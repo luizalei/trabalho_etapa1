@@ -3,6 +3,9 @@
 
 CircularBuffer ferroviaBuffer;
 CircularBuffer rodaBuffer;
+HANDLE hMutexBufferFerrovia;
+HANDLE hMutexBufferRoda;
+
 
 void InitializeBuffers() {
     // Initialize ferrovia buffer
@@ -30,18 +33,18 @@ void DestroyBuffers() {
 }
 
 void WriteToFerroviaBuffer(const char* value) {
-    EnterCriticalSection(&ferroviaBuffer.cs);
+    WaitForSingleObject(hMutexBufferFerrovia, INFINITE);
 
     // Se o buffer está cheio, não escreve e espera
     while (ferroviaBuffer.count >= BUFFER_SIZE) {
         ferroviaBuffer.isFull = TRUE;
         ResetEvent(ferroviaBuffer.hEventSpaceAvailable);
-        LeaveCriticalSection(&ferroviaBuffer.cs);
+        ReleaseMutex(hMutexBufferFerrovia); //Libera MUTEX
 
         // Espera por espaço disponível
         WaitForSingleObject(ferroviaBuffer.hEventSpaceAvailable, INFINITE);
 
-        EnterCriticalSection(&ferroviaBuffer.cs);
+        WaitForSingleObject(hMutexBufferFerrovia, INFINITE);
     }
 
     errno_t err = strncpy_s(ferroviaBuffer.data[ferroviaBuffer.tail],
@@ -58,21 +61,21 @@ void WriteToFerroviaBuffer(const char* value) {
         printf("Erro ao copiar mensagem para o buffer ferrovia: %d\n", err);
     }
 
-    LeaveCriticalSection(&ferroviaBuffer.cs);
+    ReleaseMutex(hMutexBufferFerrovia); //Libera MUTEX
 }
 
 void WriteToRodaBuffer(const char* value) {
-    EnterCriticalSection(&rodaBuffer.cs);
+    WaitForSingleObject(hMutexBufferRoda, INFINITE);
 
     while (rodaBuffer.count >= BUFFER_SIZE) {
         rodaBuffer.isFull = TRUE;
         ResetEvent(rodaBuffer.hEventSpaceAvailable); // Garante que o evento não está sinalizado
-        LeaveCriticalSection(&rodaBuffer.cs);
+        ReleaseMutex(hMutexBufferRoda); //Libera MUTEX
 
         // Espera por espaço disponível
         WaitForSingleObject(rodaBuffer.hEventSpaceAvailable, INFINITE);
 
-        EnterCriticalSection(&rodaBuffer.cs);
+        WaitForSingleObject(hMutexBufferRoda, INFINITE);
     }
 
     errno_t err = strncpy_s(rodaBuffer.data[rodaBuffer.tail],
@@ -89,11 +92,11 @@ void WriteToRodaBuffer(const char* value) {
         printf("Erro ao copiar mensagem para o buffer roda: %d\n", err);
     }
 
-    LeaveCriticalSection(&rodaBuffer.cs);
+    ReleaseMutex(hMutexBufferRoda); //Libera MUTEX
 }
 
 int ReadFromFerroviaBuffer(char* output) {
-    EnterCriticalSection(&ferroviaBuffer.cs);
+    WaitForSingleObject(hMutexBufferFerrovia, INFINITE);
 
     int result = 0;
     if (ferroviaBuffer.count > 0) {
@@ -122,12 +125,12 @@ int ReadFromFerroviaBuffer(char* output) {
         printf("Buffer ferrovia vazio - nada para ler.\n");
     }
 
-    LeaveCriticalSection(&ferroviaBuffer.cs);
+    ReleaseMutex(hMutexBufferFerrovia); //Libera MUTEX
     return result;
 }
 
 int ReadFromRodaBuffer(char* output) {
-    EnterCriticalSection(&rodaBuffer.cs);
+    WaitForSingleObject(hMutexBufferRoda, INFINITE);
 
     int result = 0;
     if (rodaBuffer.count > 0) {
@@ -156,13 +159,14 @@ int ReadFromRodaBuffer(char* output) {
         printf("Buffer roda vazio - nada para ler.\n");
     }
 
-    LeaveCriticalSection(&rodaBuffer.cs);
+    ReleaseMutex(hMutexBufferRoda); //Libera MUTEX
     return result;
 }
 
 void PrintBuffers() {
-    EnterCriticalSection(&ferroviaBuffer.cs);
-    EnterCriticalSection(&rodaBuffer.cs);
+    WaitForSingleObject(hMutexBufferFerrovia, INFINITE);
+    WaitForSingleObject(hMutexBufferRoda, INFINITE);
+    
 
     printf("=== Buffers ===\n");
     printf("Ferrovia [%d/%d] %s:\n", ferroviaBuffer.count, BUFFER_SIZE,
@@ -182,6 +186,6 @@ void PrintBuffers() {
     }
     printf("\n");
 
-    LeaveCriticalSection(&rodaBuffer.cs);
-    LeaveCriticalSection(&ferroviaBuffer.cs);
+    ReleaseMutex(hMutexBufferRoda); //Libera MUTEX
+    ReleaseMutex(hMutexBufferFerrovia); //Libera MUTEX
 }

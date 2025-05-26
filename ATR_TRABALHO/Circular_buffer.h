@@ -24,6 +24,10 @@ typedef struct {
 extern CircularBuffer ferroviaBuffer;
 extern CircularBuffer rodaBuffer;
 
+//Definição dos mutex de proteção dos buffers
+extern HANDLE hMutexBufferFerrovia;
+extern HANDLE hMutexBufferRoda;
+
 void InitializeBuffers();
 void DestroyBuffers();
 void WriteToFerroviaBuffer(const char* value);
