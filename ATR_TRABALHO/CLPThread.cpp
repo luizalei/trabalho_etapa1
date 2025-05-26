@@ -219,12 +219,12 @@ DWORD WINAPI CLPThread(LPVOID) {
 int main() {
     InitializeBuffers();
 
-    HANDLE hThread;
+    HANDLE hCLPThread;
     DWORD dwThreadId;
     hEvent_ferrovia = CreateEvent(NULL, TRUE, FALSE, L"EvTimeOutFerrovia");
 
     // Cria a thread CLP que escreve no buffer
-    hThread = (HANDLE)_beginthreadex(
+    hCLPThread = (HANDLE)_beginthreadex(
         NULL,
         0,
         (CAST_FUNCTION)CLPThread,
@@ -233,7 +233,7 @@ int main() {
         (CAST_LPDWORD)&dwThreadId
     );
 
-    if (hThread) {
+    if (hCLPThread) {
         printf("Thread CLP criada com ID=0x%x\n", dwThreadId);
     }
 
@@ -247,8 +247,8 @@ int main() {
     }
 
     // Limpeza
-    WaitForSingleObject(hThread, INFINITE);
-    CloseHandle(hThread);
+    WaitForSingleObject(hCLPThread, INFINITE);
+    CloseHandle(hCLPThread);
     DestroyBuffers();
     CloseHandle(hMutexBufferRoda);
     CloseHandle(hMutexBufferFerrovia);
