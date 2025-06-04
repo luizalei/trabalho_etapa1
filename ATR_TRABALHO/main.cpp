@@ -211,7 +211,18 @@ DWORD WINAPI CLPThread(LPVOID) {
         Sleep(tempo_ferrovia); //Temporizador temporário para a entrega da etapa 1
 		cria_msg_ferrovia(); // Chama a função de criação da mensagem de ferrovia
         
-    }while (1);
+    }while (1); //MUDAR PARA QUE A THREAD DE LEITURA DO TECLADO ENCERRE ESSA
+
+    return 0;
+}
+
+//############## FUNÇÃO DA THREAD DE LEITURA RODA QUENTE###############
+DWORD WINAPI RodaQuenteThread(LPVOID) {
+    
+    do {
+        
+
+    } while (1);
 
     return 0;
 }
@@ -221,8 +232,10 @@ int main() {
     InitializeBuffers();
 
     HANDLE hCLPThread;
+	HANDLE hRodaQuenteThread;
     DWORD dwThreadId;
     hEvent_ferrovia = CreateEvent(NULL, TRUE, FALSE, L"EvTimeOutFerrovia");
+
 
     // Cria a thread CLP que escreve no buffer
     hCLPThread = (HANDLE)_beginthreadex(
@@ -238,6 +251,20 @@ int main() {
         printf("Thread CLP criada com ID=0x%x\n", dwThreadId);
     }
 
+    // Cria a thread de visualização das Rodas Quentes
+    hRodaQuenteThread = (HANDLE)_beginthreadex(
+        NULL,
+        0,
+        (CAST_FUNCTION)RodaQuenteThread,
+        NULL,
+        0,
+        (CAST_LPDWORD)&dwThreadId
+    );
+
+    if (hRodaQuenteThread) {
+        printf("Thread CLP criada com ID=0x%x\n", dwThreadId);
+    }
+
     // Loop principal que lê e exibe o buffer periodicamente
     while (!_kbhit()) {
         PrintBuffers();
@@ -247,6 +274,7 @@ int main() {
     // Limpeza
     WaitForSingleObject(hCLPThread, INFINITE);
     CloseHandle(hCLPThread);
+    CloseHandle(hRodaQuenteThread);
     DestroyBuffers();
     CloseHandle(hMutexBufferRoda);
     CloseHandle(hMutexBufferFerrovia);
