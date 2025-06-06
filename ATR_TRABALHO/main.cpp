@@ -10,6 +10,7 @@
 #include <process.h>
 #include <conio.h>
 #include <sstream>
+#include <wchar.h>
 
 //############ DEFINIÇÕES GLOBAIS ############
 #define __WIN32_WINNT 0X0500
@@ -317,13 +318,27 @@ int main() {
     si.cb = sizeof(si);
     ZeroMemory(&pi, sizeof(pi));
 
-    WCHAR currentDir[MAX_PATH];
-    GetCurrentDirectory(MAX_PATH, currentDir);
-    wprintf(L"[DEBUG] Diretório atual: %s\n", currentDir);
 
-    // Criação de processo separado com novo console para Hotboxes
+    //##########COLOCA UM PATH GERAL###################
+    WCHAR exePath[MAX_PATH];
+    WCHAR hotboxesPath[MAX_PATH];
+    WCHAR sinalizacaoPath[MAX_PATH];
+    GetModuleFileNameW(NULL, exePath, MAX_PATH);
+    WCHAR* lastSlash = wcsrchr(exePath, L'\\');
+    if (lastSlash) {
+        *lastSlash = L'\0';  // Trunca o caminho, removendo o nome do .exe
+    }
+    swprintf(hotboxesPath, MAX_PATH, L"%s\\VisualizaHotboxes.exe", exePath);
+    swprintf(sinalizacaoPath, MAX_PATH, L"%s\\VisualizaSinalizacao.exe", exePath);
+
+    //Para arrumar os bugs
+    //wprintf(L"[DEBUG] Caminho VisualizaHotboxes: %s\n", hotboxesPath);
+    //wprintf(L"[DEBUG] Caminho VisualizaSinalizacao: %s\n", sinalizacaoPath);
+
+
+    //###### Criação de processo separado com novo console para Hotboxes #########
     if (CreateProcess(
-        L"C:\\Users\\laert\\source\\repos\\trabalho_etapa1\\x64\\Debug\\VisualizaHotboxes.exe", // Nome do executável do processo filho
+        hotboxesPath, // Nome do executável do processo filho
         NULL,                      // Argumentos da linha de comando
         NULL,                      // Atributos de segurança do processo
         NULL,                      // Atributos de segurança da thread
@@ -342,9 +357,9 @@ int main() {
         printf("Erro ao criar processo VisualizaHotboxes.exe. Código do erro: %lu\n", GetLastError());
     }
 
-    // Criação de processo separado com novo console para Sinalização Ferroviária
+    //##### Criação de processo separado com novo console para Sinalização Ferroviária #####
     if (CreateProcess(
-        L"C:\\Users\\laert\\source\\repos\\trabalho_etapa1\\x64\\Debug\\VisualizaSinalizacao.exe", // Nome do executável do processo filho
+        sinalizacaoPath, // Nome do executável do processo filho
         NULL,                      // Argumentos da linha de comando
         NULL,                      // Atributos de segurança do processo
         NULL,                      // Atributos de segurança da thread

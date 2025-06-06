@@ -5,7 +5,7 @@
 
 DWORD WINAPI ThreadVisualizaSinalizacao(LPVOID) {
     while (1) {
-        printf("Thread de Visualização de Sinalizacao Ferroviaria funcionando\n");
+        printf("Thread de Visualizacao de Sinalizacao Ferroviaria funcionando\n");
         Sleep(3000); // 3 segundos
     }
     return 0;

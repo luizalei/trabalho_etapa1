@@ -5,7 +5,7 @@
 
 DWORD WINAPI ThreadVisualizaHotboxes(LPVOID) {
     while (1) {
-        printf("Thread de Visualização de Hotboxes funcionando\n");
+        printf("Thread de Visualizacao de Hotboxes funcionando\n");
         Sleep(3000); // 3 segundos
     }
     return 0;
