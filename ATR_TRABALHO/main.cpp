@@ -165,7 +165,7 @@ void cria_msg_roda() {
 
 //############## FUNÇÃO DA THREAD DE SIMULAÇÃO DO CLP ###############
 DWORD WINAPI CLPThread(LPVOID) {
-	// Inicializa os eventos e a fila de temporizadores
+    // Inicializa os eventos e a fila de temporizadores
     HANDLE hTimerQueue;
     HANDLE hEvent_ferrovia;
     HANDLE hEvent_roda;
@@ -191,7 +191,7 @@ DWORD WINAPI CLPThread(LPVOID) {
         // Verifica buffer roda
         WaitForSingleObject(hMutexBufferRoda, INFINITE);//Conquista MUTEX
         BOOL rodaCheia = rodaBuffer.isFull;
-		ReleaseMutex(hMutexBufferRoda); //Libera MUTEX
+        ReleaseMutex(hMutexBufferRoda); //Libera MUTEX
 
         if (rodaCheia) {
             WaitForSingleObject(rodaBuffer.hEventSpaceAvailable, INFINITE);
@@ -207,22 +207,53 @@ DWORD WINAPI CLPThread(LPVOID) {
         }
 
         int tempo_ferrovia = 100 + (rand() % 1901); //tempo aleatório entre 100 e 2000ms
-		//SERÁ SUBSTITUIDO NA ENTREGA DA ETAPA 2 PARA RETIRADA DA FUNÇÃO SLEEP()
+        //SERÁ SUBSTITUIDO NA ENTREGA DA ETAPA 2 PARA RETIRADA DA FUNÇÃO SLEEP()
         Sleep(tempo_ferrovia); //Temporizador temporário para a entrega da etapa 1
-		cria_msg_ferrovia(); // Chama a função de criação da mensagem de ferrovia
-        
-    }while (1); //MUDAR PARA QUE A THREAD DE LEITURA DO TECLADO ENCERRE ESSA
+        cria_msg_ferrovia(); // Chama a função de criação da mensagem de ferrovia
+
+    } while (1); //MUDAR PARA QUE A THREAD DE LEITURA DO TECLADO ENCERRE ESSA
 
     return 0;
 }
 
-//############## FUNÇÃO DA THREAD DE LEITURA RODA QUENTE###############
-DWORD WINAPI RodaQuenteThread(LPVOID) {
-    
-    do {
-        
+//############## FUNÇÃO DA THREAD DE CAPTURA DE RODA QUENTE###############
+DWORD WINAPI CapturaHotboxThread(LPVOID) {
+    char mensagem[SMALL_MSG_LENGTH];
 
-    } while (1);
+    printf("[Hotbox-Captura] Thread iniciada.\n");
+
+    while (1) {
+        if (ReadFromRodaBuffer(mensagem)) {
+            // Confirma se é uma mensagem tipo 99
+            if (mensagem[8] == '9' && mensagem[9] == '9') {
+                printf("[Hotbox] %s\n", mensagem);
+            }
+        }
+        else {
+            Sleep(100); //reduz o consumo de CPU e ainda mantém a verificação do buffer com certa frequente (10 vezes por segundo)
+        }
+    }
+
+    return 0;
+}
+
+//############## FUNÇÃO DA THREAD DE CAPTURA DE SINALIZAÇÃO FERROVIÁRIA ###############
+DWORD WINAPI CapturaSinalizacaoThread(LPVOID) {
+    char mensagem[MAX_MSG_LENGTH];
+
+    printf("[Ferrovia-Captura] Thread iniciada.\n");
+
+    while (1) {
+        if (ReadFromFerroviaBuffer(mensagem)) {
+            // Verifica se é mensagem tipo 00 (sinalização ferroviária)
+            if (mensagem[8] == '0' && mensagem[9] == '0') {
+                printf("[Ferrovia] %s\n", mensagem);
+            }
+        }
+        else {
+            Sleep(100); // Evita uso intenso da CPU
+        }
+    }
 
     return 0;
 }
@@ -232,7 +263,7 @@ int main() {
     InitializeBuffers();
 
     HANDLE hCLPThread;
-	HANDLE hRodaQuenteThread;
+    HANDLE hCapturaHotboxThread;
     DWORD dwThreadId;
     hEvent_ferrovia = CreateEvent(NULL, TRUE, FALSE, L"EvTimeOutFerrovia");
 
@@ -250,21 +281,66 @@ int main() {
     if (hCLPThread) {
         printf("Thread CLP criada com ID=0x%x\n", dwThreadId);
     }
-
-    // Cria a thread de visualização das Rodas Quentes
-    hRodaQuenteThread = (HANDLE)_beginthreadex(
+    // CRia a thread de Captura de Dados dos HotBoxes
+    hCapturaHotboxThread = (HANDLE)_beginthreadex(
         NULL,
         0,
-        (CAST_FUNCTION)RodaQuenteThread,
+        (CAST_FUNCTION)CapturaHotboxThread,
+        NULL,
+        0,
+        (CAST_LPDWORD)&dwThreadId
+    );
+    if (hCapturaHotboxThread) {
+        printf("Thread CapturaHotbox criada com ID=0x%x\n", dwThreadId);
+    }
+
+    // Cria a thread de Captura de Dados da Sinalização Ferroviária
+    HANDLE hCapturaSinalizacaoThread;
+    hCapturaSinalizacaoThread = (HANDLE)_beginthreadex(
+        NULL,
+        0,
+        (CAST_FUNCTION)CapturaSinalizacaoThread,
         NULL,
         0,
         (CAST_LPDWORD)&dwThreadId
     );
 
-    if (hRodaQuenteThread) {
-        printf("Thread CLP criada com ID=0x%x\n", dwThreadId);
+    if (hCapturaSinalizacaoThread) {
+        printf("Thread CapturaSinalizacao criada com ID=0x%x\n", dwThreadId);
     }
 
+
+    // === CRIAÇÃO DO PROCESSO VISUALIZA_HOTBOXES.EXE COM NOVO CONSOLE ===
+    STARTUPINFO si;
+    PROCESS_INFORMATION pi;
+    ZeroMemory(&si, sizeof(si));
+    si.cb = sizeof(si);
+    ZeroMemory(&pi, sizeof(pi));
+
+    WCHAR currentDir[MAX_PATH];
+    GetCurrentDirectory(MAX_PATH, currentDir);
+    wprintf(L"[DEBUG] Diretório atual: %s\n", currentDir);
+
+    // Criação de processo separado com novo console
+    if (CreateProcess(
+        L"C:\\Users\\laert\\source\\repos\\trabalho_etapa1\\x64\\Debug\\VisualizaHotboxes.exe", // Nome do executável do processo filho
+        NULL,                      // Argumentos da linha de comando
+        NULL,                      // Atributos de segurança do processo
+        NULL,                      // Atributos de segurança da thread
+        FALSE,                     // Herança de handles
+        CREATE_NEW_CONSOLE,       // Cria nova janela de console
+        NULL,                      // Ambiente padrão
+        NULL,                      // Diretório padrão
+        &si,                       // Informações de inicialização
+        &pi                        // Informações sobre o processo criado
+    )) {
+        printf("Processo visualiza_hotboxes.exe criado com sucesso!\n");
+        CloseHandle(pi.hProcess);
+        CloseHandle(pi.hThread);
+    }
+    else {
+        printf("Erro ao criar processo visualiza_hotboxes.exe. Código do erro: %lu\n", GetLastError());
+    }
     // Loop principal que lê e exibe o buffer periodicamente
     while (!_kbhit()) {
         PrintBuffers();
@@ -273,8 +349,13 @@ int main() {
 
     // Limpeza
     WaitForSingleObject(hCLPThread, INFINITE);
+    WaitForSingleObject(hCapturaHotboxThread, INFINITE);
+    WaitForSingleObject(hCapturaSinalizacaoThread, INFINITE);
+
     CloseHandle(hCLPThread);
-    CloseHandle(hRodaQuenteThread);
+    CloseHandle(hCapturaHotboxThread);
+    CloseHandle(hCapturaSinalizacaoThread);
+
     DestroyBuffers();
     CloseHandle(hMutexBufferRoda);
     CloseHandle(hMutexBufferFerrovia);
@@ -284,4 +365,3 @@ int main() {
 
     return 0;
 }
-
