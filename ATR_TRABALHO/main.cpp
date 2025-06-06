@@ -26,7 +26,11 @@ HANDLE hEvent_ferrovia; // Handle para o evento de timeout da ferrovia
 HANDLE hEvent_roda; // Handle para o evento de timeout da roda
 HANDLE WINAPI CreateTimerQueue(VOID);
 HANDLE hBufferRodaCheio;  // Evento para sinalizar espaço no buffer
-
+//handles para a tarefa de leitura do teclado
+HANDLE evCLP_PauseResume, evFERROVIA_PauseResume, evHOTBOX_PauseResume;
+HANDLE evVISUFERROVIA_PauseResume, evVISUHOTBOX_PauseResume;
+HANDLE evCLP_Exit, evFERROVIA_Exit, evHOTBOX_Exit;
+HANDLE evVISUFERROVIA_Exit, evVISUHOTBOX_Exit;
 DWORD WINAPI CLPThread(LPVOID);
 
 
@@ -267,8 +271,19 @@ int main() {
     HANDLE hCapturaHotboxThread;
     DWORD dwThreadId;
     hEvent_ferrovia = CreateEvent(NULL, TRUE, FALSE, L"EvTimeOutFerrovia");
+    // Eventos de pausa/retomada
+    evCLP_PauseResume = CreateEvent(NULL, TRUE, FALSE, L"EV_CLP_PAUSE");
+    evFERROVIA_PauseResume = CreateEvent(NULL, TRUE, FALSE, L"EV_FERROVIA_PAUSE");
+    evHOTBOX_PauseResume = CreateEvent(NULL, TRUE, FALSE, L"EV_HOTBOX_PAUSE");
+    evVISUFERROVIA_PauseResume = CreateEvent(NULL, TRUE, FALSE, L"EV_VISUFERROVIA_PAUSE");
+    evVISUHOTBOX_PauseResume = CreateEvent(NULL, TRUE, FALSE, L"EV_VISUHOTBOX_PAUSE");
 
-
+    // Eventos de término
+    evCLP_Exit = CreateEvent(NULL, TRUE, FALSE, L"EV_CLP_EXIT");
+    evFERROVIA_Exit = CreateEvent(NULL, TRUE, FALSE, L"EV_FERROVIA_EXIT");
+    evHOTBOX_Exit = CreateEvent(NULL, TRUE, FALSE, L"EV_HOTBOX_EXIT");
+    evVISUFERROVIA_Exit = CreateEvent(NULL, TRUE, FALSE, L"EV_VISUFERROVIA_EXIT");
+    evVISUHOTBOX_Exit = CreateEvent(NULL, TRUE, FALSE, L"EV_VISUHOTBOX_EXIT");
     // Cria a thread CLP que escreve no buffer
     hCLPThread = (HANDLE)_beginthreadex(
         NULL,
@@ -378,11 +393,65 @@ int main() {
         printf("Erro ao criar processo VisualizaSinalizacao.exe. Código do erro: %lu\n", GetLastError());
     }
 
-    // Loop principal que lê e exibe o buffer periodicamente
-    while (!_kbhit()) {
+    //Leitura do Teclado
+    BOOL executando = TRUE;
+    BOOL clp_pausado = FALSE;
+    BOOL ferrovia_pausado = FALSE;
+    BOOL hotbox_pausado = FALSE;
+    BOOL visuFerrovia_pausado = FALSE;
+    BOOL visuHotbox_pausado = FALSE;
+    while (executando) {
+        if (_kbhit()) {
+            int tecla = _getch();
+
+            switch (tecla) {
+            case 'c':
+                clp_pausado = !clp_pausado;
+                SetEvent(evCLP_PauseResume);
+                printf("CLP %s\n", clp_pausado ? "PAUSADO" : "RETOMADO");
+                break;
+
+            case 'd':
+                ferrovia_pausado = !ferrovia_pausado;
+                SetEvent(evFERROVIA_PauseResume);
+                printf("Captura Ferrovia %s\n", ferrovia_pausado ? "PAUSADA" : "RETOMADA");
+                break;
+
+            case 'h':
+                hotbox_pausado = !hotbox_pausado;
+                SetEvent(evHOTBOX_PauseResume);
+                printf("Captura Hotbox %s\n", hotbox_pausado ? "PAUSADA" : "RETOMADA");
+                break;
+
+            case 's':
+                visuFerrovia_pausado = !visuFerrovia_pausado;
+                SetEvent(evVISUFERROVIA_PauseResume);
+                printf("Visualização Ferrovia %s\n", visuFerrovia_pausado ? "PAUSADA" : "RETOMADA");
+                break;
+
+            case 'q':
+                visuHotbox_pausado = !visuHotbox_pausado;
+                SetEvent(evVISUHOTBOX_PauseResume);
+                printf("Visualização Hotbox %s\n", visuHotbox_pausado ? "PAUSADA" : "RETOMADA");
+                break;
+
+            case 27: // ESC
+                printf("Encerrando todas as tarefas...\n");
+                SetEvent(evCLP_Exit);
+                SetEvent(evFERROVIA_Exit);
+                SetEvent(evHOTBOX_Exit);
+                SetEvent(evVISUFERROVIA_Exit);
+                SetEvent(evVISUHOTBOX_Exit);
+                executando = FALSE;
+                break;
+            }
+        }
+
         PrintBuffers();
-        Sleep(1000); // Verifica o buffer a cada segundo
+        Sleep(1000); // Atualização periódica
     }
+
+
 
     // Limpeza
     WaitForSingleObject(hCLPThread, INFINITE);
