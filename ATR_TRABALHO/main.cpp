@@ -321,7 +321,7 @@ int main() {
     GetCurrentDirectory(MAX_PATH, currentDir);
     wprintf(L"[DEBUG] Diretório atual: %s\n", currentDir);
 
-    // Criação de processo separado com novo console
+    // Criação de processo separado com novo console para Hotboxes
     if (CreateProcess(
         L"C:\\Users\\laert\\source\\repos\\trabalho_etapa1\\x64\\Debug\\VisualizaHotboxes.exe", // Nome do executável do processo filho
         NULL,                      // Argumentos da linha de comando
@@ -334,13 +334,35 @@ int main() {
         &si,                       // Informações de inicialização
         &pi                        // Informações sobre o processo criado
     )) {
-        printf("Processo visualiza_hotboxes.exe criado com sucesso!\n");
+        printf("Processo VisualizaHotboxes.exe criado com sucesso!\n");
         CloseHandle(pi.hProcess);
         CloseHandle(pi.hThread);
     }
     else {
-        printf("Erro ao criar processo visualiza_hotboxes.exe. Código do erro: %lu\n", GetLastError());
+        printf("Erro ao criar processo VisualizaHotboxes.exe. Código do erro: %lu\n", GetLastError());
     }
+
+    // Criação de processo separado com novo console para Sinalização Ferroviária
+    if (CreateProcess(
+        L"C:\\Users\\laert\\source\\repos\\trabalho_etapa1\\x64\\Debug\\VisualizaSinalizacao.exe", // Nome do executável do processo filho
+        NULL,                      // Argumentos da linha de comando
+        NULL,                      // Atributos de segurança do processo
+        NULL,                      // Atributos de segurança da thread
+        FALSE,                     // Herança de handles
+        CREATE_NEW_CONSOLE,       // Cria nova janela de console
+        NULL,                      // Ambiente padrão
+        NULL,                      // Diretório padrão
+        &si,                       // Informações de inicialização
+        &pi                        // Informações sobre o processo criado
+    )) {
+        printf("Processo VisualizaSinalizacao.exe criado com sucesso!\n");
+        CloseHandle(pi.hProcess);
+        CloseHandle(pi.hThread);
+    }
+    else {
+        printf("Erro ao criar processo VisualizaSinalizacao.exe. Código do erro: %lu\n", GetLastError());
+    }
+
     // Loop principal que lê e exibe o buffer periodicamente
     while (!_kbhit()) {
         PrintBuffers();
