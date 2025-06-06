@@ -15,7 +15,9 @@ typedef struct {
     int head;
     int tail;
     int count;
-    CRITICAL_SECTION cs;  // Seção crítica para proteger o buffer
+    CRITICAL_SECTION cs;
+    HANDLE sem_vaga;     // quantas posições estão disponíveis
+    HANDLE sem_ocupado;  // quantas mensagens estão disponíveis
 } CircularBuffer;
 
 // Variável global do buffer
@@ -26,5 +28,6 @@ void DestroyBuffer();
 void WriteToBuffer(const char* value, size_t msg_size); 
 int ReadFromBuffer(char* output, size_t* msg_size);
 void PrintBuffer();
+
 
 #endif // CIRCULAR_BUFFER_H

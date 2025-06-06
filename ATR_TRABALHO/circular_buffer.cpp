@@ -1,97 +1,100 @@
 #include "circular_buffer.h"
 #include <string.h>
 
-CircularBuffer circularBuffer;
+static CircularBuffer circularBuffer;
 
 void InitializeBuffer() {
     circularBuffer.head = 0;
     circularBuffer.tail = 0;
     circularBuffer.count = 0;
     InitializeCriticalSection(&circularBuffer.cs);
+
+    circularBuffer.sem_vaga = CreateSemaphore(NULL, BUFFER_SIZE, BUFFER_SIZE, NULL);
+    circularBuffer.sem_ocupado = CreateSemaphore(NULL, 0, BUFFER_SIZE, NULL);
 }
 
 void DestroyBuffer() {
     DeleteCriticalSection(&circularBuffer.cs);
+    CloseHandle(circularBuffer.sem_vaga);
+    CloseHandle(circularBuffer.sem_ocupado);
 }
 
 void WriteToBuffer(const char* value, size_t msg_size) {
+    // Espera vaga disponível
+    WaitForSingleObject(circularBuffer.sem_vaga, INFINITE);
+
     EnterCriticalSection(&circularBuffer.cs);
 
-    if (circularBuffer.count < BUFFER_SIZE) {
-        if (msg_size == 34 || msg_size == 40) {
-            size_t buffer_size = (msg_size == 34) ? SMALL_MSG_LENGTH : MAX_MSG_LENGTH;
-            size_t copy_size = (msg_size == 34) ? SMALL_MSG_LENGTH - 1 : MAX_MSG_LENGTH - 1;
+    if (msg_size == 34 || msg_size == 40) {
+        size_t copy_size = (msg_size < MAX_MSG_LENGTH) ? msg_size : MAX_MSG_LENGTH - 1;
 
-            // Usando strncpy_s com verificação de tamanho
-            errno_t err = strncpy_s(circularBuffer.data[circularBuffer.tail],
-                buffer_size,
-                value,
-                copy_size);
+        errno_t err = strncpy_s(
+            circularBuffer.data[circularBuffer.tail],
+            MAX_MSG_LENGTH,
+            value,
+            copy_size
+        );
 
-            if (err == 0) {
-                circularBuffer.tail = (circularBuffer.tail + 1) % BUFFER_SIZE;
-                circularBuffer.count++;
-            }
-            else {
-                printf("Erro ao copiar mensagem para o buffer: %d\n", err);
-            }
+        if (err != 0) {
+            printf("[Buffer] Erro ao copiar mensagem: %d\n", err);
         }
         else {
-            printf("Tamanho de mensagem inválido: %zu\n", msg_size);
+            circularBuffer.data[circularBuffer.tail][copy_size] = '\0'; // Garante null-terminador
+            circularBuffer.tail = (circularBuffer.tail + 1) % BUFFER_SIZE;
+            circularBuffer.count++;
         }
     }
     else {
-        printf("Buffer cheio - mensagem descartada: %s\n", value);
+        printf("[Buffer] Tamanho de mensagem inválido: %zu\n", msg_size);
     }
 
     LeaveCriticalSection(&circularBuffer.cs);
+    ReleaseSemaphore(circularBuffer.sem_ocupado, 1, NULL);
 }
 
 int ReadFromBuffer(char* output, size_t* msg_size) {
+    // Espera até que haja mensagem
+    WaitForSingleObject(circularBuffer.sem_ocupado, INFINITE);
+
     EnterCriticalSection(&circularBuffer.cs);
 
     int result = 0;
-    if (circularBuffer.count > 0) {
-        size_t len = strlen(circularBuffer.data[circularBuffer.head]);
-        if (len == 34 || len == 40) {
-            // Usando strncpy_s com verificação de tamanho
-            errno_t err = strncpy_s(output,
-                (len == 34) ? SMALL_MSG_LENGTH : MAX_MSG_LENGTH,
-                circularBuffer.data[circularBuffer.head],
-                len);
+    size_t len = strlen(circularBuffer.data[circularBuffer.head]);
 
-            if (err == 0) {
-                *msg_size = len;
-                circularBuffer.head = (circularBuffer.head + 1) % BUFFER_SIZE;
-                circularBuffer.count--;
-                result = 1;
-            }
-            else {
-                printf("Erro ao ler mensagem do buffer: %d\n", err);
-            }
+    if (len == 34 || len == 40) {
+        errno_t err = strncpy_s(output, MAX_MSG_LENGTH, circularBuffer.data[circularBuffer.head], len);
+
+        if (err == 0) {
+            output[len] = '\0';
+            *msg_size = len;
+            circularBuffer.head = (circularBuffer.head + 1) % BUFFER_SIZE;
+            circularBuffer.count--;
+            result = 1;
         }
         else {
-            printf("Mensagem corrompida no buffer - tamanho inválido: %zu\n", len);
+            printf("[Buffer] Erro ao ler mensagem: %d\n", err);
         }
     }
     else {
-        printf("Buffer vazio - nada para ler.\n");
+        printf("[Buffer] Mensagem corrompida no buffer (tamanho inválido: %zu)\n", len);
     }
 
     LeaveCriticalSection(&circularBuffer.cs);
+    ReleaseSemaphore(circularBuffer.sem_vaga, 1, NULL);
+
     return result;
 }
 
 void PrintBuffer() {
     EnterCriticalSection(&circularBuffer.cs);
 
-    printf("Buffer [%d/%d]:\n", circularBuffer.count, BUFFER_SIZE);
+    printf("[Buffer] Conteúdo (%d mensagens):\n", circularBuffer.count);
     int index = circularBuffer.head;
+
     for (int i = 0; i < circularBuffer.count; i++) {
-        printf("%s (%zu chars)\n", circularBuffer.data[index], strlen(circularBuffer.data[index]));
+        printf("  %s\n", circularBuffer.data[index]);
         index = (index + 1) % BUFFER_SIZE;
     }
-    printf("\n");
 
     LeaveCriticalSection(&circularBuffer.cs);
 }
