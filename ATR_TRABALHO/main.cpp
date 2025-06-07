@@ -171,7 +171,7 @@ void cria_msg_roda() {
 DWORD WINAPI CLPThread(LPVOID) {
 
     HANDLE BlockingEvents[2] = { evCLP_Exit , evCLP_PauseResume };
-    WaitForMultipleObjects(2, BlockingEvents, FALSE, INFINITE);
+    
 
     //COMENTADO POIS A PRIMEIRA ENTREGA DEVE UTILIZAR APENAS A FUNÇÃO SLEEP()
     // Inicializa os eventos e a fila de temporizadores
@@ -198,6 +198,7 @@ DWORD WINAPI CLPThread(LPVOID) {
     //}
 
     do {
+        WaitForMultipleObjects(2, BlockingEvents, FALSE, INFINITE);
         // Verifica buffer roda
         WaitForSingleObject(hMutexBufferRoda, INFINITE);//Conquista MUTEX
         BOOL rodaCheia = rodaBuffer.isFull;
@@ -228,8 +229,8 @@ DWORD WINAPI CLPThread(LPVOID) {
 
 //############# FUNÇÃO CRIA MENSAGENS DE RODA QUENTE #############
 DWORD WINAPI CLPMsgRodaQuente(LPVOID) { 
+    HANDLE BlockingEvents[2] = { evCLP_Exit , evCLP_PauseResume };
     do {
-        HANDLE BlockingEvents[2] = { evCLP_Exit , evCLP_PauseResume };
         WaitForMultipleObjects(2, BlockingEvents, FALSE, INFINITE);
 
 		Sleep(500); // Espera 500ms para criar uma nova mensagem de roda quente
@@ -464,8 +465,6 @@ int main() {
                 break;
             }
         }
-
-        PrintBuffers();
         Sleep(1000); // Atualização periódica
     }
 

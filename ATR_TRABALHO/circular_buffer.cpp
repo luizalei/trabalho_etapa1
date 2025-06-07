@@ -121,9 +121,6 @@ int ReadFromFerroviaBuffer(char* output) {
             printf("Erro ao ler mensagem do buffer ferrovia: %d\n", err);
         }
     }
-    else {
-        printf("Buffer ferrovia vazio - nada para ler.\n");
-    }
 
     ReleaseMutex(hMutexBufferFerrovia); //Libera MUTEX
     return result;
@@ -155,10 +152,7 @@ int ReadFromRodaBuffer(char* output) {
             printf("Erro ao ler mensagem do buffer roda: %d\n", err);
         }
     }
-    else {
-        printf("Buffer roda vazio - nada para ler.\n");
-    }
-
+    
     ReleaseMutex(hMutexBufferRoda); //Libera MUTEX
     return result;
 }
