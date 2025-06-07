@@ -36,9 +36,9 @@ typedef struct {
     char tipo[3];       // Sempre "00"
     int8_t diag;        // Diagnóstico (0-9)
     int16_t remota;     // Remota (000-999)
-    char id[9];         // ID do sensor (8 chars + null terminator)
+    char id[9];         // ID do sensor 
     int8_t estado;      // Estado (1 ou 2)
-    char timestamp[13]; // HH:MM:SS:MS (12 chars + null terminator)
+    char timestamp[13]; // HH:MM:SS:MS 
 } mensagem_ferrovia;
 
 //######### STRUCT MENSAGEM RODA ##########
@@ -47,9 +47,9 @@ typedef struct {
     char tipo[3];       // Sempre "00"
     int8_t diag;        // Diagnóstico (0-9)
     int16_t remota;     // Remota (000-999)
-    char id[9];         // ID do sensor (8 chars + null terminator)
+    char id[9];         // ID do sensor 
     int8_t estado;      // Estado (1 ou 2)
-    char timestamp[13]; // HH:MM:SS:MS (12 chars + null terminator)
+    char timestamp[13]; // HH:MM:SS:MS 
 } mensagem_roda;
 
 //########## FUNÇÃO PARA TIMESTAMP HH:MM:SS:MS ################
@@ -79,11 +79,11 @@ void formatar_msg_roda(char* buffer, size_t buffer_size, const mensagem_roda* ms
     // Formata a mensagem no padrão especificado: NNNNNNN;NN;AAAAAAAA;N;HH:MM:SS:MS
     // Total: 7 + 1 + 2 + 1 + 8 + 1 + 1 + 1 + 12 = 34 caracteres
     sprintf_s(buffer, buffer_size, "%07d;%s;%s;%d;%s",
-        msg->nseq,      // 7 dígitos (NSEQ)
-        msg->tipo,      // 2 caracteres (TIPO)
-        msg->id,        // 8 caracteres (ID)
-        msg->estado,    // 1 dígito (ESTADO)
-        msg->timestamp  // 12 caracteres (TIMESTAMP)
+        msg->nseq,      
+        msg->tipo,      
+        msg->id,        
+        msg->estado,    
+        msg->timestamp  
     );
 }
 
@@ -172,21 +172,22 @@ DWORD WINAPI CLPThread(LPVOID) {
     HANDLE hEvent_roda;
 
     BOOL status_queue;
-
+    
     //Cria fila de temporizadores
-    hTimerQueue = CreateTimerQueue();
+    /*hTimerQueue = CreateTimerQueue();
     if (hTimerQueue == NULL) {
         printf("Falha em CreateTimerQueue! Codigo =%d)\n", GetLastError());
         return 0;
-    }
+    }*/
 
     // Enfileira o temporizador da roda quente, fora do DO WHILE porque tem temporização fixa e posso usar a temporização periódica
-    status_queue = CreateTimerQueueTimer(&hEvent_roda, hTimerQueue, (WAITORTIMERCALLBACK)cria_msg_roda,
+    /*status_queue = CreateTimerQueueTimer(&hEvent_roda, hTimerQueue, (WAITORTIMERCALLBACK)cria_msg_roda,
         NULL, 500, 500, WT_EXECUTEDEFAULT);
     if (!status_queue) {
         printf("Erro em CreateTimerQueueTimer [2]! Codigo = %d)\n", GetLastError());
         return 0;
-    }
+    }*/
+	
 
     do {
         // Verifica buffer roda
@@ -208,6 +209,7 @@ DWORD WINAPI CLPThread(LPVOID) {
         }
 
         int tempo_ferrovia = 100 + (rand() % 1901); //tempo aleatório entre 100 e 2000ms
+
         //SERÁ SUBSTITUIDO NA ENTREGA DA ETAPA 2 PARA RETIRADA DA FUNÇÃO SLEEP()
         Sleep(tempo_ferrovia); //Temporizador temporário para a entrega da etapa 1
         cria_msg_ferrovia(); // Chama a função de criação da mensagem de ferrovia
@@ -215,6 +217,16 @@ DWORD WINAPI CLPThread(LPVOID) {
     } while (1); //MUDAR PARA QUE A THREAD DE LEITURA DO TECLADO ENCERRE ESSA
 
     return 0;
+}
+
+DWORD WINAPI CLPCriaMsgRoda(LPVOID) {
+    do {
+		Sleep(500); // Espera 500ms entre as mensagens de roda quente
+		cria_msg_roda();
+
+	} while (1); // MUDAR PARA QUE A THREAD DE LEITURA DO TECLADO ENCERRE ESSA
+
+	return 0;
 }
 
 //############## FUNÇÃO DA THREAD DE CAPTURA DE RODA QUENTE###############
@@ -255,7 +267,6 @@ DWORD WINAPI CapturaSinalizacaoThread(LPVOID) {
             Sleep(100); // Evita uso intenso da CPU
         }
     }
-
     return 0;
 }
 
@@ -311,7 +322,7 @@ int main() {
     }
 
 
-    // === CRIAÇÃO DO PROCESSO VISUALIZA_HOTBOXES.EXE COM NOVO CONSOLE ===
+    //######## CRIAÇÃO DO PROCESSO VISUALIZA_HOTBOXES.EXE COM NOVO CONSOLE #########
     STARTUPINFO si;
     PROCESS_INFORMATION pi;
     ZeroMemory(&si, sizeof(si));
