@@ -480,7 +480,7 @@ int main() {
         printf("Erro ao criar processo VisualizaSinalizacao.exe. Código do erro: %lu\n", GetLastError());
     }
 
-    //Leitura do Teclado
+    //############ LEITURA DO TECLADO ################
     BOOL executando = TRUE;
     BOOL clp_pausado = FALSE;
     BOOL ferrovia_pausado = FALSE;
