@@ -286,6 +286,8 @@ DWORD WINAPI CapturaHotboxThread(LPVOID) {
             return 0; // Encerra a thread
         }
 
+        WaitForSingleObject(hMutexBufferRoda, INFINITE);//Conquista MUTEX para leitura da lista circular
+               
         if (ReadFromRodaBuffer(mensagem)) {
             // Confirma se é uma mensagem tipo 99
             if (mensagem[8] == '9' && mensagem[9] == '9') {
@@ -294,8 +296,10 @@ DWORD WINAPI CapturaHotboxThread(LPVOID) {
             }
         }
         else {
-            Sleep(100); //reduz o consumo de CPU e ainda mantém a verificação do buffer com certa frequente (10 vezes por segundo)
+            Sleep(100); //reduz o consumo de CPU e ainda mantém a verificação do buffer com certa frequencia (10 vezes por segundo)
         }
+
+        ReleaseMutex(hMutexBufferRoda); //Libera MUTEX
     }
 
     return 0;
@@ -313,6 +317,8 @@ DWORD WINAPI CapturaSinalizacaoThread(LPVOID) {
             return 0; // Encerra a thread
         }
 
+        WaitForSingleObject(hMutexBufferFerrovia, INFINITE); //Conquista MUTEX para leitura da lista circular
+        
         if (ReadFromFerroviaBuffer(mensagem)) {
             // Verifica se é mensagem tipo 00 (sinalização ferroviária)
             if (mensagem[8] == '0' && mensagem[9] == '0') {
@@ -322,6 +328,8 @@ DWORD WINAPI CapturaSinalizacaoThread(LPVOID) {
         else {
             Sleep(100); // Evita uso intenso da CPU
         }
+
+        ReleaseMutex(hMutexBufferFerrovia); //Libera MUTEX
     }
 
     return 0;
