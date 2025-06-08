@@ -27,12 +27,13 @@ HANDLE hEvent_roda; // Handle para o evento de timeout da roda
 //HANDLE WINAPI CreateTimerQueue(VOID);
 HANDLE hBufferRodaCheio;  // Evento para sinalizar espaço no buffer
 //handles para a tarefa de leitura do teclado
-HANDLE evCLP_PauseResume, evFERROVIA_PauseResume, evHOTBOX_PauseResume;
+HANDLE evCLPFerrovia_PauseResume, evCLPHotbox_PauseResume, evFERROVIA_PauseResume, evHOTBOX_PauseResume;
 HANDLE evVISUFERROVIA_PauseResume, evVISUHOTBOX_PauseResume;
 HANDLE evCLP_Exit, evFERROVIA_Exit, evHOTBOX_Exit;
 HANDLE evVISUFERROVIA_Exit, evVISUHOTBOX_Exit;
-DWORD WINAPI CLPThread(LPVOID);
-
+HANDLE evEncerraThreads;
+DWORD WINAPI hCLPThreadFerrovia(LPVOID);
+DWORD WINAPI hCLPThreadRoda(LPVOID);
 
 //######### STRUCT MENSAGEM FERROVIA ##########
 typedef struct {
@@ -138,6 +139,7 @@ void cria_msg_ferrovia() {
 
     // Escreve no buffer circular
     WriteToFerroviaBuffer(buffer);
+    printf("\033[32mMensagem Ferrovia criada: %s\033[0m\n", buffer);
 }
 
 //############# FUNÇÃO DE CRIAÇÃO DE MSG RODA QUENTE ################
@@ -165,49 +167,16 @@ void cria_msg_roda() {
 
     // Escreve no buffer circular
     WriteToRodaBuffer(buffer);
+    printf("\033[32mMensagem Hotbox criada: %s\033[0m\n", buffer);
 }
 
-//############## FUNÇÃO DA THREAD DE SIMULAÇÃO DO CLP ###############
-DWORD WINAPI CLPThread(LPVOID) {
 
-    HANDLE BlockingEvents[2] = { evCLP_Exit , evCLP_PauseResume };
-    
+//############# THREAD CRIA MENSAGENS DE FERROVIA CLP #############
+DWORD WINAPI CLPMsgFerrovia(LPVOID) {
+    BOOL pausado = FALSE;
+    HANDLE eventos[2] = {evCLP_Exit, evCLPFerrovia_PauseResume };
 
-    //COMENTADO POIS A PRIMEIRA ENTREGA DEVE UTILIZAR APENAS A FUNÇÃO SLEEP()
-    // Inicializa os eventos e a fila de temporizadores
-    //HANDLE hTimerQueue;
-    //HANDLE hEvent_ferrovia;
-    //HANDLE hEvent_roda;
-
-    //BOOL status_queue;
-
-    
-    ////Cria fila de temporizadores
-    //hTimerQueue = CreateTimerQueue();
-    //if (hTimerQueue == NULL) {
-    //    printf("Falha em CreateTimerQueue! Codigo =%d)\n", GetLastError());
-    //    return 0;
-    //}
-
-    //// Enfileira o temporizador da roda quente, fora do DO WHILE porque tem temporização fixa e posso usar a temporização periódica
-    //status_queue = CreateTimerQueueTimer(&hEvent_roda, hTimerQueue, (WAITORTIMERCALLBACK)cria_msg_roda,
-    //    NULL, 500, 500, WT_EXECUTEDEFAULT);
-    //if (!status_queue) {
-    //    printf("Erro em CreateTimerQueueTimer [2]! Codigo = %d)\n", GetLastError());
-    //    return 0;
-    //}
-
-    do {
-        WaitForMultipleObjects(2, BlockingEvents, FALSE, INFINITE);
-        // Verifica buffer roda
-        WaitForSingleObject(hMutexBufferRoda, INFINITE);//Conquista MUTEX
-        BOOL rodaCheia = rodaBuffer.isFull;
-        ReleaseMutex(hMutexBufferRoda); //Libera MUTEX
-
-        if (rodaCheia) {
-            WaitForSingleObject(rodaBuffer.hEventSpaceAvailable, INFINITE);
-        }
-
+    while (1) {
         // Verifica buffer ferrovia
         WaitForSingleObject(hMutexBufferFerrovia, INFINITE); //Conquista MUTEX
         BOOL ferroviaCheia = ferroviaBuffer.isFull;
@@ -217,27 +186,93 @@ DWORD WINAPI CLPThread(LPVOID) {
             WaitForSingleObject(ferroviaBuffer.hEventSpaceAvailable, INFINITE);
         }
 
-        int tempo_ferrovia = 100 + (rand() % 1901); //tempo aleatório entre 100 e 2000ms
-        //SERÁ SUBSTITUIDO NA ENTREGA DA ETAPA 2 PARA RETIRADA DA FUNÇÃO SLEEP()
-        Sleep(tempo_ferrovia); //Temporizador temporário para a entrega da etapa 1
-        cria_msg_ferrovia(); // Chama a função de criação da mensagem de ferrovia
+        // Verifica eventos sem bloquear 
+        DWORD ret = WaitForMultipleObjects(2, eventos, FALSE, 0);
 
-    } while (1); //MUDAR PARA QUE A THREAD DE LEITURA DO TECLADO ENCERRE ESSA
+        switch (ret) {
+        case WAIT_OBJECT_0: // evCLP_Exit
+            return 0;
 
+        case WAIT_OBJECT_0 + 1: // evCLPFerrovia_PauseResume
+            pausado = !pausado;
+            printf("Thread Ferrovia %s\n", pausado ? "PAUSADA" : "RETOMADA");
+            ResetEvent(evCLPFerrovia_PauseResume);
+            break;
+
+        case WAIT_TIMEOUT:
+
+            break;
+
+        default:
+            printf("Erro: %d\n", GetLastError());
+            return 1;
+        }
+
+        if (!pausado) { //Se a thread estiver permitida de rodar
+
+            int tempo_ferrovia = 100 + (rand() % 1901); // 100-2000ms
+            Sleep(tempo_ferrovia);
+            cria_msg_ferrovia();
+        }
+        else {
+            // Se pausado, verifica eventos mais frequentemente
+            Sleep(100);
+        }
+    }
     return 0;
 }
 
-//############# FUNÇÃO CRIA MENSAGENS DE RODA QUENTE #############
-DWORD WINAPI CLPMsgRodaQuente(LPVOID) { 
-    HANDLE BlockingEvents[2] = { evCLP_Exit , evCLP_PauseResume };
-    do {
-        WaitForMultipleObjects(2, BlockingEvents, FALSE, INFINITE);
+//############# THREAD CRIA MENSAGENS DE RODA QUENTE CLP #############
+DWORD WINAPI CLPMsgRodaQuente(LPVOID) {
+    BOOL pausado = FALSE;
+    HANDLE eventos[2] = {evCLP_Exit, evCLPHotbox_PauseResume};
 
-		Sleep(500); // Espera 500ms para criar uma nova mensagem de roda quente
-		cria_msg_roda(); // Chama a função de criação da mensagem de roda quente
-    } while (1);
-	return 0;
+    while (1) {
+        // Verifica buffer roda
+        WaitForSingleObject(hMutexBufferRoda, INFINITE);//Conquista MUTEX
+        BOOL rodaCheia = rodaBuffer.isFull;
+        ReleaseMutex(hMutexBufferRoda); //Libera MUTEX
+
+        if (rodaCheia) {
+            WaitForSingleObject(rodaBuffer.hEventSpaceAvailable, INFINITE);
+        }
+
+
+        // Verifica eventos sem bloquear 
+        DWORD ret = WaitForMultipleObjects(2, eventos, FALSE, 0);
+
+        switch (ret) {
+        case WAIT_OBJECT_0: // evCLP_Exit
+            return 0;
+
+        case WAIT_OBJECT_0 + 1: // evCLPHotbox_PauseResume
+            pausado = !pausado;
+            printf("Thread Hotbox %s\n", pausado ? "PAUSADA" : "RETOMADA");
+            ResetEvent(evCLPHotbox_PauseResume);
+            break;
+
+        case WAIT_TIMEOUT:
+
+            break;
+
+        default:
+            printf("Erro: %d\n", GetLastError());
+            return 1;
+        }
+
+        if (!pausado) { //Se a thread estiver permitida de rodar
+            
+            Sleep(500);
+            cria_msg_roda();
+        }
+        else {
+            // Se pausado, verifica eventos mais frequentemente
+            Sleep(100);
+        }
+    }
+    return 0;
 }
+
 
 //############## FUNÇÃO DA THREAD DE CAPTURA DE RODA QUENTE###############
 DWORD WINAPI CapturaHotboxThread(LPVOID) {
@@ -246,10 +281,16 @@ DWORD WINAPI CapturaHotboxThread(LPVOID) {
     printf("[Hotbox-Captura] Thread iniciada.\n");
 
     while (1) {
+        if (WaitForSingleObject(evEncerraThreads, 0) == WAIT_OBJECT_0) {
+            printf("[Hotbox-Captura] Thread encerrada.\n");
+            return 0; // Encerra a thread
+        }
+
         if (ReadFromRodaBuffer(mensagem)) {
             // Confirma se é uma mensagem tipo 99
             if (mensagem[8] == '9' && mensagem[9] == '9') {
-                printf("[Hotbox] %s\n", mensagem);
+                printf("\033[31mMensagem lida de Hotbox: %s\033[0m\n", mensagem);
+
             }
         }
         else {
@@ -267,10 +308,15 @@ DWORD WINAPI CapturaSinalizacaoThread(LPVOID) {
     printf("[Ferrovia-Captura] Thread iniciada.\n");
 
     while (1) {
+        if (WaitForSingleObject(evEncerraThreads, 0) == WAIT_OBJECT_0) {
+            printf("[Ferrovia-Captura] Thread encerrada.\n");
+            return 0; // Encerra a thread
+        }
+
         if (ReadFromFerroviaBuffer(mensagem)) {
             // Verifica se é mensagem tipo 00 (sinalização ferroviária)
             if (mensagem[8] == '0' && mensagem[9] == '0') {
-                printf("[Ferrovia] %s\n", mensagem);
+                printf("\033[31mMensagem lida de Ferrovia: %s\033[0m\n", mensagem);
             }
         }
         else {
@@ -285,36 +331,51 @@ DWORD WINAPI CapturaSinalizacaoThread(LPVOID) {
 int main() {
     InitializeBuffers();
 
-    HANDLE hCLPThread;
+    HANDLE hCLPThreadFerrovia;
+    HANDLE hCLPThreadRoda;
     HANDLE hCapturaHotboxThread;
     DWORD dwThreadId;
     hEvent_ferrovia = CreateEvent(NULL, TRUE, FALSE, L"EvTimeOutFerrovia");
     // Eventos de pausa/retomada
-    evCLP_PauseResume = CreateEvent(NULL, TRUE, FALSE, L"EV_CLP_PAUSE");
+    evCLPHotbox_PauseResume = CreateEvent(NULL, FALSE, FALSE, L"EV_CLPH_PAUSE");
+    evCLPFerrovia_PauseResume = CreateEvent(NULL, FALSE, FALSE, L"EV_CLPF_PAUSE");
+    //evCLP_PauseResume = CreateEvent(NULL, TRUE, FALSE, L"EV_CLP_PAUSE");
     evFERROVIA_PauseResume = CreateEvent(NULL, TRUE, FALSE, L"EV_FERROVIA_PAUSE");
-    evHOTBOX_PauseResume = CreateEvent(NULL, TRUE, FALSE, L"EV_HOTBOX_PAUSE");
+    evHOTBOX_PauseResume = CreateEvent(NULL, TRUE, FALSE, L"EV_HOTBOX_PAUSE"); 
     evVISUFERROVIA_PauseResume = CreateEvent(NULL, TRUE, FALSE, L"EV_VISUFERROVIA_PAUSE");
     evVISUHOTBOX_PauseResume = CreateEvent(NULL, TRUE, FALSE, L"EV_VISUHOTBOX_PAUSE");
 
     // Eventos de término
     evCLP_Exit = CreateEvent(NULL, TRUE, FALSE, L"EV_CLP_EXIT");
-    evFERROVIA_Exit = CreateEvent(NULL, TRUE, FALSE, L"EV_FERROVIA_EXIT");
-    evHOTBOX_Exit = CreateEvent(NULL, TRUE, FALSE, L"EV_HOTBOX_EXIT");
-    evVISUFERROVIA_Exit = CreateEvent(NULL, TRUE, FALSE, L"EV_VISUFERROVIA_EXIT");
-    evVISUHOTBOX_Exit = CreateEvent(NULL, TRUE, FALSE, L"EV_VISUHOTBOX_EXIT");
-    // Cria a thread CLP que escreve no buffer
-    hCLPThread = (HANDLE)_beginthreadex(
+    evEncerraThreads = CreateEvent(NULL, TRUE, FALSE, L"EV_ENCERRA_THREADS"    );
+    // Cria a thread CLP que escreve no buffer ferrovia
+    hCLPThreadFerrovia = (HANDLE)_beginthreadex(
         NULL,
         0,
-        (CAST_FUNCTION)CLPThread,
+        (CAST_FUNCTION)CLPMsgFerrovia,
         NULL,
         0,
         (CAST_LPDWORD)&dwThreadId
     );
 
-    if (hCLPThread) {
+    if (hCLPThreadFerrovia) {
         printf("Thread CLP criada com ID=0x%x\n", dwThreadId);
     }
+
+    // Cria a thread CLP que escreve no buffer roda
+    hCLPThreadRoda = (HANDLE)_beginthreadex(
+        NULL,
+        0,
+        (CAST_FUNCTION)CLPMsgRodaQuente,
+        NULL,
+        0,
+        (CAST_LPDWORD)&dwThreadId
+    );
+
+    if (hCLPThreadRoda) {
+        printf("Thread CLP criada com ID=0x%x\n", dwThreadId);
+    }
+
     // CRia a thread de Captura de Dados dos HotBoxes
     hCapturaHotboxThread = (HANDLE)_beginthreadex(
         NULL,
@@ -426,7 +487,8 @@ int main() {
             switch (tecla) {
             case 'c':
                 clp_pausado = !clp_pausado;
-                SetEvent(evCLP_PauseResume);
+                SetEvent(evCLPFerrovia_PauseResume); 
+                SetEvent(evCLPHotbox_PauseResume);
                 printf("CLP %s\n", clp_pausado ? "PAUSADO" : "RETOMADO");
                 break;
 
@@ -457,10 +519,7 @@ int main() {
             case 27: // ESC
                 printf("Encerrando todas as tarefas...\n");
                 SetEvent(evCLP_Exit);
-                SetEvent(evFERROVIA_Exit);
-                SetEvent(evHOTBOX_Exit);
-                SetEvent(evVISUFERROVIA_Exit);
-                SetEvent(evVISUHOTBOX_Exit);
+                SetEvent(evEncerraThreads);
                 executando = FALSE;
                 break;
             }
@@ -468,16 +527,36 @@ int main() {
         Sleep(1000); // Atualização periódica
     }
 
-
-
     // Limpeza
-    WaitForSingleObject(hCLPThread, INFINITE);
+    WaitForSingleObject(hCLPThreadFerrovia, INFINITE);
+	printf("Thread CLP Ferrovia terminou\n");
+    WaitForSingleObject(hCLPThreadRoda, INFINITE);
+    printf("Thread CLP roda terminou\n");
     WaitForSingleObject(hCapturaHotboxThread, INFINITE);
     WaitForSingleObject(hCapturaSinalizacaoThread, INFINITE);
 
-    CloseHandle(hCLPThread);
+    // Fecha handles das threads
+    CloseHandle(hCLPThreadFerrovia);
+    CloseHandle(hCLPThreadRoda);
     CloseHandle(hCapturaHotboxThread);
     CloseHandle(hCapturaSinalizacaoThread);
+
+    // Fecha handles de eventos
+    CloseHandle(hEvent_ferrovia);
+    CloseHandle(hEvent_roda);
+    CloseHandle(hBufferRodaCheio);
+    CloseHandle(evCLPFerrovia_PauseResume);
+    CloseHandle(evCLPHotbox_PauseResume);
+    CloseHandle(evFERROVIA_PauseResume);
+    CloseHandle(evHOTBOX_PauseResume);
+    CloseHandle(evVISUFERROVIA_PauseResume);
+    CloseHandle(evVISUHOTBOX_PauseResume);
+    CloseHandle(evCLP_Exit);
+    CloseHandle(evEncerraThreads);
+    CloseHandle(evFERROVIA_Exit);
+    CloseHandle(evHOTBOX_Exit);
+    CloseHandle(evVISUFERROVIA_Exit);
+    CloseHandle(evVISUHOTBOX_Exit);
 
     DestroyBuffers();
     CloseHandle(hMutexBufferRoda);
