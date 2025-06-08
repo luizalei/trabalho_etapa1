@@ -104,12 +104,12 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\Users\luiza\OneDrive\Documentos\UFMG\ATR\pthreads-w32-2-9-1-release\Pre-built.2\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Program Files\pthreads-w32-2-9-1-release\Pre-built.2\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>C:\Users\luiza\OneDrive\Documentos\UFMG\ATR\pthreads-w32-2-9-1-release\Pre-built.2\lib\x64</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\Program Files\pthreads-w32-2-9-1-release\Pre-built.2\lib\x64</AdditionalLibraryDirectories>
       <AdditionalDependencies>pthreadVC2.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
@@ -121,14 +121,14 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\Users\luiza\OneDrive\Documentos\UFMG\ATR\pthreads-w32-2-9-1-release\Pre-built.2\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Program Files\pthreads-w32-2-9-1-release\Pre-built.2\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>C:\Users\luiza\OneDrive\Documentos\UFMG\ATR\pthreads-w32-2-9-1-release\Pre-built.2\lib\x64</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\Program Files\pthreads-w32-2-9-1-release\Pre-built.2\lib\x64</AdditionalLibraryDirectories>
       <AdditionalDependencies>pthreadVC2.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
