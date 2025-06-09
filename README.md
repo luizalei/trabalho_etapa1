@@ -34,8 +34,8 @@ O projeto foi dividido em duas etapas:
 
 ## Autoras
 
-- **[Camila Chagas Carvalho]**
-- **[Luiza Calheiros Lei]** *(caso em dupla)*
+- **Camila Chagas Carvalho**
+- **Luiza Calheiros Lei**
 
 *Curso de Engenharia Eletrônica - Universidade Federal de Minas Gerais (UFMG)*
 
