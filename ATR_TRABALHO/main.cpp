@@ -27,7 +27,7 @@ HANDLE hEvent_roda; // Handle para o evento de timeout da roda
 //HANDLE WINAPI CreateTimerQueue(VOID);
 HANDLE hBufferRodaCheio;  // Evento para sinalizar espaço no buffer
 //handles para a tarefa de leitura do teclado
-HANDLE evCLPFerrovia_PauseResume, evCLPHotbox_PauseResume, evFERROVIA_PauseResume, evHOTBOX_PauseResume;
+HANDLE evCLPFerrovia_PauseResume, evCLPHotbox_PauseResume, evFERROVIA_PauseResume, evHOTBOX_PauseResume, evTemporização;
 HANDLE evVISUFERROVIA_PauseResume, evVISUHOTBOX_PauseResume;
 HANDLE evCLP_Exit, evFERROVIA_Exit, evHOTBOX_Exit;
 HANDLE evVISUFERROVIA_Exit, evVISUHOTBOX_Exit;
@@ -211,12 +211,16 @@ DWORD WINAPI CLPMsgFerrovia(LPVOID) {
         if (!pausado) { //Se a thread estiver permitida de rodar
 
             int tempo_ferrovia = 100 + (rand() % 1901); // 100-2000ms
-            Sleep(tempo_ferrovia);
+
+            WaitForSingleObject(evTemporização, tempo_ferrovia); // evento que nunca será setado apenas para bloquear a thread 
+
+            //Sleep(tempo_ferrovia);
             cria_msg_ferrovia();
         }
         else {
             // Se pausado, verifica eventos mais frequentemente
-            Sleep(100);
+			WaitForSingleObject(evTemporização, 100); // evento que nunca será setado apenas para bloquear a thread
+            //Sleep(100);
         }
     }
     return 0;
@@ -262,12 +266,14 @@ DWORD WINAPI CLPMsgRodaQuente(LPVOID) {
 
         if (!pausado) { //Se a thread estiver permitida de rodar
             
-            Sleep(500);
+            //Sleep(500);
+            WaitForSingleObject(evTemporização, 500); // evento que nunca será setado apenas para bloquear a thread
             cria_msg_roda();
         }
         else {
             // Se pausado, verifica eventos mais frequentemente
-            Sleep(100);
+            WaitForSingleObject(evTemporização, 100); // evento que nunca será setado apenas para bloquear a thread
+            //Sleep(100);
         }
     }
     return 0;
@@ -296,7 +302,8 @@ DWORD WINAPI CapturaHotboxThread(LPVOID) {
             }
         }
         else {
-            Sleep(100); //reduz o consumo de CPU e ainda mantém a verificação do buffer com certa frequencia (10 vezes por segundo)
+            //Sleep(100); //reduz o consumo de CPU e ainda mantém a verificação do buffer com certa frequencia (10 vezes por segundo)
+            WaitForSingleObject(evTemporização, 100); // evento que nunca será setado apenas para bloquear a thread
         }
 
         ReleaseMutex(hMutexBufferRoda); //Libera MUTEX
@@ -326,7 +333,8 @@ DWORD WINAPI CapturaSinalizacaoThread(LPVOID) {
             }
         }
         else {
-            Sleep(100); // Evita uso intenso da CPU
+            WaitForSingleObject(evTemporização, 100); // evento que nunca será setado apenas para bloquear a thread
+            //Sleep(100); // Evita uso intenso da CPU
         }
 
         ReleaseMutex(hMutexBufferFerrovia); //Libera MUTEX
@@ -346,6 +354,7 @@ int main() {
     hEvent_ferrovia = CreateEvent(NULL, TRUE, FALSE, L"EvTimeOutFerrovia");
     // Eventos de pausa/retomada
     evCLPHotbox_PauseResume = CreateEvent(NULL, FALSE, FALSE, L"EV_CLPH_PAUSE");
+	evTemporização = CreateEvent(NULL, FALSE, FALSE, L"EV_TEMPORIZACAO"); // evento que nunca sera setado apenas para temporização
     evCLPFerrovia_PauseResume = CreateEvent(NULL, FALSE, FALSE, L"EV_CLPF_PAUSE");
     //evCLP_PauseResume = CreateEvent(NULL, TRUE, FALSE, L"EV_CLP_PAUSE");
     evFERROVIA_PauseResume = CreateEvent(NULL, TRUE, FALSE, L"EV_FERROVIA_PAUSE");
@@ -532,7 +541,8 @@ int main() {
                 break;
             }
         }
-        Sleep(1000); // Atualização periódica
+        WaitForSingleObject(evTemporização, 1000); // evento que nunca será setado apenas para bloquear a thread
+        //Sleep(1000); // Atualização periódica
     }
 
     // Limpeza

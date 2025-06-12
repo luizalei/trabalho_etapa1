@@ -3,6 +3,7 @@
 
 HANDLE evVISUHOTBOX_PauseResume;
 HANDLE evVISUHOTBOX_Exit;
+HANDLE evVISUHOTBOXTemporização;
 
 DWORD WINAPI ThreadVisualizaHotboxes(LPVOID) {
     HANDLE eventos[2] = { evVISUHOTBOX_PauseResume, evVISUHOTBOX_Exit };
@@ -13,7 +14,8 @@ DWORD WINAPI ThreadVisualizaHotboxes(LPVOID) {
     while (1) {
         if (!pausado) {
             printf("Thread de Visualizacao de Hotboxes funcionando\n");
-            Sleep(1000);  // Atualização a cada segundo
+            WaitForSingleObject(evVISUHOTBOXTemporização, 1000); // evento que nunca será setado apenas para bloquear a thread
+            //Sleep(1000);  // Atualização a cada segundo
         }
 
         // Aguarda por qualquer evento sinalizado
@@ -65,6 +67,8 @@ int main() {
     // Cria os eventos com os mesmos nomes do processo principal
     evVISUHOTBOX_PauseResume = CreateEvent(NULL, TRUE, FALSE, L"EV_VISUHOTBOX_PAUSE");
     evVISUHOTBOX_Exit = CreateEvent(NULL, TRUE, FALSE, L"EV_VISUHOTBOX_EXIT");
+    evVISUHOTBOXTemporização = CreateEvent(NULL, FALSE, FALSE, L"EV_VISUHOTBOX_TEMPORIZACAO"); // evento que nunca será setado apenas para temporização
+
 
     HANDLE hThread = CreateThread(NULL, 0, ThreadVisualizaHotboxes, NULL, 0, NULL);
 
@@ -79,6 +83,7 @@ int main() {
     CloseHandle(hThread);
     CloseHandle(evVISUHOTBOX_PauseResume);
     CloseHandle(evVISUHOTBOX_Exit);
+	CloseHandle(evVISUHOTBOXTemporização);
 
     return 0;
 }

@@ -3,9 +3,10 @@
 
 HANDLE evVISUFERROVIA_PauseResume;
 HANDLE evVISUFERROVIA_Exit;
+HANDLE evTemporização;
 
 DWORD WINAPI ThreadVisualizaSinalizacao(LPVOID) {
-    HANDLE eventos[2] = { evVISUFERROVIA_PauseResume, evVISUFERROVIA_Exit };
+        HANDLE eventos[2] = { evVISUFERROVIA_PauseResume, evVISUFERROVIA_Exit };
     BOOL pausado = FALSE;
 
     printf("Thread de Visualizacao de Sinalizacao iniciada\n");
@@ -13,7 +14,8 @@ DWORD WINAPI ThreadVisualizaSinalizacao(LPVOID) {
     while (1) {
         if (!pausado) {
             printf("Thread de Visualizacao de Sinalizacao funcionando\n");
-            Sleep(1000);  // Atualização periódica
+            WaitForSingleObject(evTemporização, 100); // evento que nunca será setado apenas para bloquear a thread
+            //Sleep(1000);  // Atualização periódica
         }
 
         // Verifica os dois eventos simultaneamente (sem bloquear)
@@ -61,6 +63,7 @@ DWORD WINAPI ThreadVisualizaSinalizacao(LPVOID) {
 int main() {
     evVISUFERROVIA_PauseResume = CreateEvent(NULL, TRUE, FALSE, L"EV_VISUFERROVIA_PAUSE");
     evVISUFERROVIA_Exit = CreateEvent(NULL, TRUE, FALSE, L"EV_VISUFERROVIA_EXIT");
+	evTemporização = CreateEvent(NULL, FALSE, FALSE, L"EV_VISUFERROVIA_TEMPORIZACAO"); // evento que nunca será setado apenas para temporização
 
     HANDLE hThread = CreateThread(NULL, 0, ThreadVisualizaSinalizacao, NULL, 0, NULL);
     if (hThread == NULL) {
@@ -73,6 +76,7 @@ int main() {
     CloseHandle(hThread);
     CloseHandle(evVISUFERROVIA_PauseResume);
     CloseHandle(evVISUFERROVIA_Exit);
+	CloseHandle(evTemporização);
 
     return 0;
 }
