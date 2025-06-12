@@ -16,6 +16,37 @@ DWORD WINAPI ThreadVisualizaHotboxes(LPVOID) {
     while (1) {
         if (!pausado) {
             printf("Thread de Visualizacao de Hotboxes funcionando\n");
+            const char* mensagens[20] = {
+                "Desvio atuado",
+                "Sinaleiro em PARE",
+                "Sinaleiro em VIA LIVRE",
+                "Ocorrencia na via",
+                "Sensor inativo",
+                "Veiculo detectado",
+                "Barreira abaixada",
+                "Barreira levantada",
+                "Desvio nao confirmado",
+                "Sensor com falha",
+                "Via ocupada",
+                "Via livre",
+                "Alarme de intrusao",
+                "Alimentacao normal",
+                "Alimentacao interrompida",
+                "Sinaleiro apagado",
+                "Controle manual ativado",
+                "Controle automatico ativo",
+                "Velocidade excedida",
+                "Falha de comunicacao"
+            };
+
+            // Sorteia um índice aleatório entre 0 e 19
+            int indice = rand() % 20;
+
+            // Exibe a mensagem sorteada
+            printf("Mensagem sorteada: %s\n", mensagens[indice]);
+
+            //Usar essa variavel 'mensagens[indice]' no lugar do estado quando for printar a mensagem recebida
+
             WaitForSingleObject(evVISUHOTBOXTemporização, 1000); // evento que nunca será setado apenas para bloquear a thread
             //Sleep(1000);  // Atualização a cada segundo
         }

@@ -365,6 +365,7 @@ int main() {
     // Eventos de término
     evCLP_Exit = CreateEvent(NULL, TRUE, FALSE, L"EV_CLP_EXIT");
     evEncerraThreads = CreateEvent(NULL, TRUE, FALSE, L"EV_ENCERRA_THREADS"    );
+    
     // Cria a thread CLP que escreve no buffer ferrovia
     hCLPThreadFerrovia = (HANDLE)_beginthreadex(
         NULL,
