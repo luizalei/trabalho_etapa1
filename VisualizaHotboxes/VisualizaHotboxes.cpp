@@ -1,12 +1,14 @@
 #include <windows.h>
 #include <stdio.h>
 
+
 HANDLE evVISUHOTBOX_PauseResume;
 HANDLE evVISUHOTBOX_Exit;
 HANDLE evVISUHOTBOXTemporização;
+HANDLE evEncerraThreads; // Necessário para sincronização com a main e fechamento do console
 
 DWORD WINAPI ThreadVisualizaHotboxes(LPVOID) {
-    HANDLE eventos[2] = { evVISUHOTBOX_PauseResume, evVISUHOTBOX_Exit };
+    HANDLE eventos[2] = { evVISUHOTBOX_PauseResume, evEncerraThreads };
     BOOL pausado = FALSE;
 
     printf("Thread de Visualizacao de Hotboxes iniciada\n");
@@ -34,9 +36,9 @@ DWORD WINAPI ThreadVisualizaHotboxes(LPVOID) {
             ResetEvent(evVISUHOTBOX_PauseResume);
             break;
 
-        case WAIT_OBJECT_0 + 1:  // evVISUHOTBOX_Exit
+        case WAIT_OBJECT_0 + 1:  // evEncerraThreads
             printf("[Hotboxes] Evento de saída recebido. Encerrando thread.\n");
-            return 0;
+                        return 0;
 
         default:
             break; // Nenhum evento sinalizado, segue o loop
@@ -65,10 +67,11 @@ DWORD WINAPI ThreadVisualizaHotboxes(LPVOID) {
 
 int main() {
     // Cria os eventos com os mesmos nomes do processo principal
-    evVISUHOTBOX_PauseResume = CreateEvent(NULL, TRUE, FALSE, L"EV_VISUHOTBOX_PAUSE");
-    evVISUHOTBOX_Exit = CreateEvent(NULL, TRUE, FALSE, L"EV_VISUHOTBOX_EXIT");
-    evVISUHOTBOXTemporização = CreateEvent(NULL, FALSE, FALSE, L"EV_VISUHOTBOX_TEMPORIZACAO"); // evento que nunca será setado apenas para temporização
+   	evVISUHOTBOX_PauseResume = OpenEvent(EVENT_ALL_ACCESS, FALSE, L"EV_VISUHOTBOX_PAUSE");
+    evVISUHOTBOX_Exit = OpenEvent(EVENT_ALL_ACCESS, FALSE, L"EV_VISUHOTBOX_EXIT"); 
+   	evEncerraThreads = OpenEvent(EVENT_ALL_ACCESS, FALSE, L"EV_ENCERRA_THREADS");
 
+    evVISUHOTBOXTemporização = CreateEvent(NULL, FALSE, FALSE, L"EV_VISUHOTBOX_TEMPORIZACAO"); // evento que nunca será setado apenas para temporização
 
     HANDLE hThread = CreateThread(NULL, 0, ThreadVisualizaHotboxes, NULL, 0, NULL);
 
@@ -84,6 +87,7 @@ int main() {
     CloseHandle(evVISUHOTBOX_PauseResume);
     CloseHandle(evVISUHOTBOX_Exit);
 	CloseHandle(evVISUHOTBOXTemporização);
+	CloseHandle(evEncerraThreads);
 
     return 0;
 }

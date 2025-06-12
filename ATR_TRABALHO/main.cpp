@@ -31,7 +31,7 @@ HANDLE evCLPFerrovia_PauseResume, evCLPHotbox_PauseResume, evFERROVIA_PauseResum
 HANDLE evVISUFERROVIA_PauseResume, evVISUHOTBOX_PauseResume;
 HANDLE evCLP_Exit, evFERROVIA_Exit, evHOTBOX_Exit;
 HANDLE evVISUFERROVIA_Exit, evVISUHOTBOX_Exit;
-HANDLE evEncerraThreads;
+HANDLE evEncerraThreads=NULL;
 DWORD WINAPI hCLPThreadFerrovia(LPVOID);
 DWORD WINAPI hCLPThreadRoda(LPVOID);
 
@@ -580,8 +580,8 @@ int main() {
     CloseHandle(hMutexBufferRoda);
     CloseHandle(hMutexBufferFerrovia);
 
-    printf("\nPressione qualquer tecla para sair...\n");
-    _getch();
+    //printf("\nPressione qualquer tecla para sair...\n");
+    //_getch();
 
     return 0;
 }
