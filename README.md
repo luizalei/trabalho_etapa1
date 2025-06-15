@@ -37,7 +37,7 @@ O projeto foi dividido em duas etapas:
 - **Camila Chagas Carvalho**
 - **Luiza Calheiros Lei**
 
-*Curso de Engenharia Eletrônica - Universidade Federal de Minas Gerais (UFMG)*
+*Curso de Engenharia de Controle e Automação - Universidade Federal de Minas Gerais (UFMG)*
 
 ---
 
